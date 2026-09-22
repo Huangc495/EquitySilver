@@ -1,5 +1,9 @@
 # Handover: from replication to Azure MLOps
 
+> **Update 2026-09-22:** the six decisions in section 3 are settled, and the
+> MLOps stage has started. `MLOPS.md` records the decisions, the plan and the
+> current status. Read it after this file.
+
 **To the incoming session.** The replication of Ma et al. (2021) is finished.
 Your job is the next stage: run the same study on Azure as a production ML
 system, with CI/CD for ML, experiment tracking, a model registry, and model
