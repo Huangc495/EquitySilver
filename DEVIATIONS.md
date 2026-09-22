@@ -11,6 +11,15 @@ this dataset; **open** = needs a decision from the user.
 
 ## Environment and repo
 
+### D-00 Databricks workspace settings — *partially resolved*
+Workspace: **Equity-Silver-Databricks-MLOps** (Azure Databricks).
+MLflow experiment: `/Users/${DATABRICKS_USERNAME}/equity-silver-lstm` —
+filled in and covered by a test that fails on any unfilled placeholder.
+
+**Still outstanding:** the Unity Catalog `<catalog>` and `<schema>` for the
+Volume holding the raw data. Until those are supplied, `paths.databricks`
+cannot be used.
+
 ### D-01 Dependency pins are not yet confirmed against the cluster — *open*
 `CLAUDE.md` says to pin `requirements.txt` from `pip freeze` on the Databricks
 cluster. No cluster access was available, so the pins target **Databricks
@@ -451,3 +460,27 @@ here — adding a deviation without one raises, so the two cannot drift apart.
 | 6. Sensitivity directions hold | **replicated**, 3/3 |
 
 **5 replicated, 1 partial.**
+
+
+---
+
+## Post-replication fixes
+
+### D-30 POSIX-absolute config paths were re-rooted on Windows — *fixed*
+Found while verifying the Databricks path set after filling in the workspace
+username.
+
+`Config.resolve` used `Path.is_absolute()` to decide whether to join a
+configured path to the repo root. On Windows a bare leading slash is **not**
+absolute, so `/Volumes/<catalog>/<schema>/raw` silently became
+`C:\Volumes\<catalog>\<schema>aw` — re-rooted onto the repo's drive.
+
+The cluster itself was never affected (Linux treats the path as absolute), so
+this would only ever have surfaced as a confusing failure when simulating or
+testing the Databricks path set from a Windows machine. `config._resolve_against`
+now treats a leading "/" as absolute on every platform.
+
+**Effect:** none on any result in this replication — every reported number came
+from the local path set. Covered by `tests/test_config.py`, including a
+regression test for the re-rooting and one that fails if any `<placeholder>`
+remains in the MLflow experiment path.

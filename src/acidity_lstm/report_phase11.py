@@ -25,6 +25,7 @@ HEADING = re.compile(r"^### ((?:D|Q)-\d+) (.+?) — \*(.+?)\*\s*$", re.M)
 
 # Likely effect of each deviation on the replication. Keyed to DEVIATIONS.md.
 LIKELY_EFFECT = {
+    "D-00": "None on results. Deployment configuration; the catalog and schema are still outstanding.",
     "D-01": "None on results. Environment reproducibility only; confirm the pins against the cluster.",
     "D-02": "None. Same data source as the paper (Equity Silver, Climate ID 1072692).",
     "D-03": "None. Code organisation only.",
@@ -54,6 +55,7 @@ LIKELY_EFFECT = {
     "D-27": "Important for interpretation. Phase 9 MSEs must not be compared with Table 1's.",
     "D-28": "Material for reading the forecast. The headline is the best of five; a typical run is about twice the paper's value.",
     "D-29": "Material for trusting the forecast. The tag is unconstrained outside its training range.",
+    "D-30": "None on any reported result; every number came from the local path set. Fixed, with a regression test.",
     "Q-01": "Moderate. ~185 Type B samples make every metric noisy; run-to-run SD exceeds our mean gap to the paper.",
     "Q-02": "None, once tested. Type B still beats Type A on identical samples.",
     "Q-03": "Resolved in D-13.",

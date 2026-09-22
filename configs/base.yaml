@@ -18,8 +18,8 @@ paths:
 mlflow:
   local_tracking_uri: file:./mlruns
   local_experiment: equity-silver-lstm
-  # TODO(user): replace <you> with the Databricks workspace username.
-  databricks_experiment: /Users/<you>/equity-silver-lstm
+  # Workspace: Equity-Silver-Databricks-MLOps (Azure Databricks).
+  databricks_experiment: /Users/${DATABRICKS_USERNAME}/equity-silver-lstm
 
 data:
   weather_start: 1997-01-01

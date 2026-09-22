@@ -116,10 +116,11 @@ On held-out data alone the baseline still wins at C7, so this is not purely a se
 
 ## Every deviation and its likely effect
 
-32 entries, parsed directly from `DEVIATIONS.md` so the two cannot drift apart. Full reasoning for each is in that file.
+34 entries, parsed directly from `DEVIATIONS.md` so the two cannot drift apart. Full reasoning for each is in that file.
 
 | id   | deviation                                                           | status                        | likely effect                                                                                                                |
 |------|---------------------------------------------------------------------|-------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| D-00 | Databricks workspace settings                                       | partially resolved            | None on results. Deployment configuration; the catalog and schema are still outstanding.                                     |
 | D-01 | Dependency pins are not yet confirmed against the cluster           | open                          | None on results. Environment reproducibility only; confirm the pins against the cluster.                                     |
 | D-02 | Raw data layout differs from the config sketch                      | active                        | None. Same data source as the paper (Equity Silver, Climate ID 1072692).                                                     |
 | D-03 | `audit.py` added to the library                                     | active                        | None. Code organisation only.                                                                                                |
@@ -149,6 +150,7 @@ On held-out data alone the baseline still wins at C7, so this is not purely a se
 | D-27 | Forecast MSEs are not comparable with Table 1's                     | active, consequence of D-18   | Important for interpretation. Phase 9 MSEs must not be compared with Table 1's.                                              |
 | D-28 | The headline forecast MSE is the best of a wide spread              | open caveat                   | Material for reading the forecast. The headline is the best of five; a typical run is about twice the paper's value.         |
 | D-29 | The time tag genuinely extrapolates in Phase 9                      | active, quantified            | Material for trusting the forecast. The tag is unconstrained outside its training range.                                     |
+| D-30 | POSIX-absolute config paths were re-rooted on Windows               | fixed                         | None on any reported result; every number came from the local path set. Fixed, with a regression test.                       |
 | Q-01 | Type B loses about half the samples                                 | open, quantified in Phase 6   | Moderate. ~185 Type B samples make every metric noisy; run-to-run SD exceeds our mean gap to the paper.                      |
 | Q-02 | Type B is a strict subset of Type A                                 | resolved in Phase 6           | None, once tested. Type B still beats Type A on identical samples.                                                           |
 | Q-03 | Whole-year blocked splits are not directly possible                 | resolved in Phase 5, see D-13 | Resolved in D-13.                                                                                                            |
@@ -162,7 +164,7 @@ On held-out data alone the baseline still wins at C7, so this is not purely a se
 | Config    | `configs/base.yaml` (every setting and seed)                                              |
 | Base seed | 42                                                                                        |
 | Repeats   | 5                                                                                         |
-| Tests     | `pytest` - 195 test functions across 10 files (more cases once parametrised tests expand) |
+| Tests     | `pytest` - 206 test functions across 11 files (more cases once parametrised tests expand) |
 | MLflow    | equity-silver-lstm                                                                        |
 | Reports   | `reports/` - audit, sample counts, Table 1, FC baseline, time tag, forecast, this report  |
 

@@ -12,6 +12,22 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _resolve_against(value, root: Path) -> Path:
+    """Resolve a configured path, treating a leading "/" as absolute.
+
+    The cluster paths (/Volumes/...) are POSIX-absolute, but Windows pathlib
+    does not consider a bare leading slash absolute. Without this check,
+    resolving the Databricks path set on a Windows machine would silently
+    re-root it against the repo drive (C:\\Volumes\\...) instead of leaving it
+    alone -- wrong, and easy to miss because the cluster itself is fine.
+    """
+    text = str(value)
+    path = Path(text)
+    if text.startswith("/") or path.is_absolute():
+        return path
+    return root / path
+
+
 def on_databricks() -> bool:
     """True when running inside a Databricks cluster."""
     return "DATABRICKS_RUNTIME_VERSION" in os.environ
@@ -38,15 +54,11 @@ class Config:
         tests behave the same regardless of the working directory. Databricks
         paths are already absolute (/Volumes/...).
         """
-        value = Path(str(self.paths[path_key]))
-        if value.is_absolute():
-            return value
-        return self.repo_root / value
+        return _resolve_against(self.paths[path_key], self.repo_root)
 
     @property
     def reports_dir(self) -> Path:
-        value = Path(str(self.raw["paths"]["reports_dir"]))
-        return value if value.is_absolute() else self.repo_root / value
+        return _resolve_against(self.raw["paths"]["reports_dir"], self.repo_root)
 
     @property
     def mlflow_experiment(self) -> str:
