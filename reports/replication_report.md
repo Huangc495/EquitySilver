@@ -164,7 +164,7 @@ On held-out data alone the baseline still wins at C7, so this is not purely a se
 | Config    | `configs/base.yaml` (every setting and seed)                                              |
 | Base seed | 42                                                                                        |
 | Repeats   | 5                                                                                         |
-| Tests     | `pytest` - 216 test functions across 11 files (more cases once parametrised tests expand) |
+| Tests     | `pytest` - 219 test functions across 11 files (more cases once parametrised tests expand) |
 | MLflow    | equity-silver-lstm                                                                        |
 | Reports   | `reports/` - audit, sample counts, Table 1, FC baseline, time tag, forecast, this report  |
 

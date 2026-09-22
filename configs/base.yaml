@@ -9,10 +9,13 @@ paths:
     acidity_excel: data/raw/2017 ARD Chemisty_Clean.xlsx
     processed_dir: data/processed
   databricks:
-    # TODO(user): fill in the real catalog/schema before running on the cluster.
-    weather_glob: /Volumes/<catalog>/<schema>/raw/en_climate_daily_BC_1072692_*_P1D.csv
-    acidity_excel: /Volumes/<catalog>/<schema>/raw/2017 ARD Chemisty_Clean.xlsx
-    processed_dir: /Volumes/<catalog>/<schema>/processed
+    # Unity Catalog volumes: /Volumes/<catalog>/<schema>/<volume>/<path>.
+    # Catalog equity_silver_databricks_mlops, schema default (auto-created),
+    # with `raw` and `processed` as two volumes. See docs/README.md for the
+    # DDL and the upload step.
+    weather_glob: /Volumes/equity_silver_databricks_mlops/default/raw/en_climate_daily_BC_1072692_*_P1D.csv
+    acidity_excel: /Volumes/equity_silver_databricks_mlops/default/raw/2017 ARD Chemisty_Clean.xlsx
+    processed_dir: /Volumes/equity_silver_databricks_mlops/default/processed
   reports_dir: reports
 
 mlflow:

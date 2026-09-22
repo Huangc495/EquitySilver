@@ -26,9 +26,25 @@ Environment variables**, `DATABRICKS_USERNAME=you@example.com`. The same
 mechanism works for `paths.databricks` if you would rather not commit the
 catalog and schema either.
 
-**Still outstanding:** the Unity Catalog `<catalog>` and `<schema>` for the
-Volume holding the raw data. Until those are supplied, `paths.databricks`
-cannot be used.
+Unity Catalog: catalog **`equity_silver_databricks_mlops`**, schema
+**`default`**, with `raw` and `processed` as two volumes. Volume paths are
+`/Volumes/<catalog>/<schema>/<volume>/<path>`, so those last segments are
+volume names rather than folders. `docs/README.md` carries the `CREATE VOLUME`
+statements and the upload step; `data/` stays out of the repository.
+
+**A correction worth recording:** the schema was first given as
+`equity_silver_databricks_mlops.information_schema`. That could not have
+worked for two reasons — `information_schema` is read-only system metadata
+that Unity Catalog auto-creates in every catalog and which cannot hold
+volumes, and the value was catalog-qualified where the path needs the bare
+schema name. Both would only have surfaced as a runtime failure on the
+cluster, so `tests/test_config.py` now asserts the cluster paths are
+well-formed volume paths: four segments, a bare schema name, and never
+`information_schema`.
+
+**Still outstanding:** nothing blocking. The raw data must be uploaded to the
+`raw` volume once, and `requirements.txt` still needs confirming against the
+cluster (D-01).
 
 ### D-01 Dependency pins are not yet confirmed against the cluster — *open*
 `CLAUDE.md` says to pin `requirements.txt` from `pip freeze` on the Databricks

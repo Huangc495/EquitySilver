@@ -160,6 +160,47 @@ def test_cluster_paths_resolve_unchanged(monkeypatch):
         assert resolved.startswith("/Volumes/"), key
 
 
+def test_cluster_paths_have_no_unfilled_placeholders(monkeypatch):
+    """A left-over <catalog> would only fail once the cluster ran."""
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4")
+    cfg = load_config()
+    for key in ("weather_glob", "acidity_excel", "processed_dir"):
+        value = str(cfg.paths[key])
+        assert "<" not in value and ">" not in value, f"{key}: {value}"
+
+
+def test_cluster_paths_are_well_formed_volume_paths(monkeypatch):
+    """/Volumes/<catalog>/<schema>/<volume>/... - four segments minimum.
+
+    information_schema is a read-only system schema in every Unity Catalog
+    catalog and cannot hold volumes, so it must never appear here.
+    """
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4")
+    cfg = load_config()
+    for key in ("weather_glob", "acidity_excel", "processed_dir"):
+        parts = str(cfg.paths[key]).strip("/").split("/")
+        assert parts[0] == "Volumes", key
+        assert len(parts) >= 4, f"{key} needs catalog/schema/volume: {parts}"
+        catalog, schema = parts[1], parts[2]
+        assert "." not in schema, (
+            f"{key}: schema must be the bare name, not catalog.schema: {schema}"
+        )
+        assert schema != "information_schema", (
+            f"{key}: information_schema is read-only system metadata"
+        )
+        assert catalog and schema
+
+
+def test_all_cluster_paths_share_one_catalog_and_schema(monkeypatch):
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4")
+    cfg = load_config()
+    prefixes = {
+        "/".join(str(cfg.paths[key]).strip("/").split("/")[:3])
+        for key in ("weather_glob", "acidity_excel", "processed_dir")
+    }
+    assert len(prefixes) == 1, f"paths disagree on catalog/schema: {prefixes}"
+
+
 def test_local_paths_are_absolute_and_point_at_real_data(monkeypatch):
     monkeypatch.delenv(DATABRICKS_ENV, raising=False)
     cfg = load_config()
