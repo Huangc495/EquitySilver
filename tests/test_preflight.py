@@ -217,3 +217,46 @@ def test_environment_report_is_a_requirements_block():
     assert "numpy==" in text
     for line in text.splitlines():
         assert line.startswith("#") or "==" in line
+
+
+# --- Diagnostics ----------------------------------------------------------
+
+def test_find_expected_locates_a_misplaced_upload(tmp_path):
+    from acidity_lstm.preflight import _find_expected
+
+    misplaced = tmp_path / "some_catalog" / "some_schema" / "landing"
+    misplaced.mkdir(parents=True)
+    (misplaced / "2017 ARD Chemisty_Clean.xlsx").write_text("x")
+    (misplaced / "en_climate_daily_BC_1072692_1997_P1D.csv").write_text("x")
+    (misplaced / "unrelated.txt").write_text("x")
+
+    hits = _find_expected(str(tmp_path))
+    assert len(hits) == 2
+    assert all("unrelated" not in h for h in hits)
+
+
+def test_find_expected_returns_nothing_when_absent(tmp_path):
+    from acidity_lstm.preflight import _find_expected
+
+    (tmp_path / "empty").mkdir()
+    assert _find_expected(str(tmp_path)) == []
+
+
+def test_safe_listdir_tolerates_a_missing_path(tmp_path):
+    from acidity_lstm.preflight import _safe_listdir
+
+    assert _safe_listdir(str(tmp_path / "absent")) == []
+    (tmp_path / "b").mkdir()
+    (tmp_path / "a").mkdir()
+    assert _safe_listdir(str(tmp_path)) == ["a", "b"]
+
+
+def test_diagnose_is_safe_off_cluster(cfg, capsys):
+    """Must explain itself rather than crash when /Volumes does not exist."""
+    from acidity_lstm.preflight import diagnose_volumes
+
+    diagnose_volumes(cfg, search=False)
+    out = capsys.readouterr().out
+    assert "CONFIGURED" in out
+    if not Path("/Volumes").is_dir():
+        assert "not a Databricks cluster" in out

@@ -23,7 +23,11 @@ while not (REPO_ROOT / "configs" / "base.yaml").exists() and REPO_ROOT != REPO_R
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from acidity_lstm.config import load_config
-from acidity_lstm.preflight import environment_report, run_preflight
+from acidity_lstm.preflight import (
+    diagnose_volumes,
+    environment_report,
+    run_preflight,
+)
 
 cfg = load_config(REPO_ROOT / "configs" / "base.yaml")
 
@@ -34,6 +38,21 @@ cfg = load_config(REPO_ROOT / "configs" / "base.yaml")
 # COMMAND ----------
 
 passed, table = run_preflight(cfg)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## If the data was not found
+# MAGIC
+# MAGIC Walks `/Volumes` to show which catalogs, schemas and volumes actually
+# MAGIC exist, queries the catalog for schemas that hold no volumes (those are
+# MAGIC invisible on the filesystem), and searches for the expected filenames
+# MAGIC so a misplaced upload can be located. Read-only.
+
+# COMMAND ----------
+
+if not passed:
+    diagnose_volumes(cfg)
 
 # COMMAND ----------
 

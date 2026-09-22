@@ -220,3 +220,123 @@ def environment_report() -> str:
         except md.PackageNotFoundError:
             lines.append(f"# {name}: NOT INSTALLED")
     return "\n".join(lines)
+
+
+# --- Diagnostics ----------------------------------------------------------
+
+VOLUMES_ROOT = "/Volumes"
+EXPECTED_NAMES = ("2017 ARD Chemisty_Clean.xlsx", "en_climate_daily_BC_1072692_1997_P1D.csv")
+
+
+def _spark():
+    """The active SparkSession, or None when not on a cluster."""
+    try:
+        from pyspark.sql import SparkSession
+    except ImportError:
+        return None
+    try:
+        return SparkSession.getActiveSession() or SparkSession.builder.getOrCreate()
+    except Exception:                                # noqa: BLE001
+        return None
+
+
+def _rows(spark, statement: str):
+    """Run a SHOW statement, returning [] if it is not permitted or fails."""
+    try:
+        return [tuple(r) for r in spark.sql(statement).collect()]
+    except Exception as exc:                         # noqa: BLE001
+        return [("<error>", str(exc).splitlines()[0][:120])]
+
+
+def diagnose_volumes(cfg: Config, search: bool = True) -> None:
+    """Explain why the configured Volume path holds no data.
+
+    Unity Catalog mounts volumes at /Volumes/<catalog>/<schema>/<volume>, so
+    the layout can be walked with ordinary filesystem calls. A schema with no
+    volumes does not appear there at all, which is itself the usual answer, so
+    the catalog is also queried through Spark when available.
+    """
+    import os
+
+    configured = str(cfg.paths.get("acidity_excel", ""))
+    parts = configured.strip("/").split("/")
+    catalog = parts[1] if len(parts) > 2 else ""
+    schema = parts[2] if len(parts) > 3 else ""
+
+    print("CONFIGURED")
+    print(f"  catalog : {catalog}")
+    print(f"  schema  : {schema}")
+    print(f"  path    : {configured}")
+
+    if not os.path.isdir(VOLUMES_ROOT):
+        print(f"\n{VOLUMES_ROOT} does not exist - this is not a Databricks "
+              "cluster with Unity Catalog volumes mounted. Run this notebook "
+              "on the cluster.")
+        return
+
+    print(f"\nWHAT EXISTS UNDER {VOLUMES_ROOT}")
+    catalogs = _safe_listdir(VOLUMES_ROOT)
+    if not catalogs:
+        print("  (no catalogs visible - check your permissions)")
+    for cat in catalogs:
+        print(f"  {cat}/")
+        for sch in _safe_listdir(f"{VOLUMES_ROOT}/{cat}"):
+            vols = _safe_listdir(f"{VOLUMES_ROOT}/{cat}/{sch}")
+            print(f"    {sch}/  ->  volumes: {vols or '(none)'}")
+            for vol in vols:
+                entries = _safe_listdir(f"{VOLUMES_ROOT}/{cat}/{sch}/{vol}")
+                shown = entries[:4] + (["..."] if len(entries) > 4 else [])
+                print(f"      {vol}/  {len(entries)} entries  {shown}")
+
+    spark = _spark()
+    if spark is not None and catalog:
+        print(f"\nSCHEMAS IN {catalog} (a schema with no volumes is invisible above)")
+        for row in _rows(spark, f"SHOW SCHEMAS IN `{catalog}`"):
+            print(f"  {row[0]}")
+        if schema:
+            print(f"\nVOLUMES IN {catalog}.{schema}")
+            found = _rows(spark, f"SHOW VOLUMES IN `{catalog}`.`{schema}`")
+            for row in found or [("(none)",)]:
+                print(f"  {row}")
+
+    if search:
+        print(f"\nSEARCHING {VOLUMES_ROOT} FOR THE EXPECTED FILES")
+        hits = _find_expected(VOLUMES_ROOT)
+        if not hits:
+            print("  Not found anywhere under /Volumes.")
+            print("  If you uploaded through the workspace UI the files may be "
+                  "in DBFS (/FileStore/...) or a workspace folder rather than "
+                  "a Volume - those are different storage.")
+        else:
+            for path in hits:
+                print(f"  FOUND: {path}")
+            suggested = sorted({str(Path(p).parent) for p in hits})
+            print("\n  Update configs/base.yaml paths.databricks to match, e.g.")
+            for directory in suggested:
+                print(f"    {directory}/<file>")
+
+
+def _safe_listdir(path: str) -> list:
+    import os
+
+    try:
+        return sorted(os.listdir(path))
+    except Exception:                                # noqa: BLE001
+        return []
+
+
+def _find_expected(root: str, max_entries: int = 20000) -> list:
+    """Look for the known filenames under `root`, bounded so it cannot hang."""
+    import os
+
+    hits, seen = [], 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        seen += len(filenames) + len(dirnames)
+        if seen > max_entries:
+            break
+        for name in filenames:
+            if name in EXPECTED_NAMES or name.startswith("en_climate_daily_BC_1072692"):
+                hits.append(os.path.join(dirpath, name))
+                if len(hits) >= 25:
+                    return hits
+    return hits
