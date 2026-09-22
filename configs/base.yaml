@@ -19,6 +19,9 @@ mlflow:
   local_tracking_uri: file:./mlruns
   local_experiment: equity-silver-lstm
   # Workspace: Equity-Silver-Databricks-MLOps (Azure Databricks).
+  # ${VAR} is expanded from the environment at load time and errors if unset,
+  # so no personal identifier is stored in this public repo. Set it on the
+  # cluster: Compute > Edit > Advanced options > Spark > Environment variables.
   databricks_experiment: /Users/${DATABRICKS_USERNAME}/equity-silver-lstm
 
 data:

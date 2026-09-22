@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,34 @@ from typing import Any
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# ${VAR} references in config values, expanded from the environment.
+_ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def expand_env(value: str, where: str = "config") -> str:
+    """Expand ${VAR} references, failing loudly when a variable is unset.
+
+    Used to keep deployment-specific identifiers -- the workspace username,
+    and the Unity Catalog catalog/schema if you choose -- out of the tracked
+    config, which is public. `os.path.expandvars` is not used because it
+    leaves unset variables in place silently, which would produce a path
+    containing a literal "${...}" and a confusing downstream error.
+    """
+    def substitute(match: re.Match) -> str:
+        name = match.group(1)
+        resolved = os.environ.get(name)
+        if not resolved:
+            raise KeyError(
+                f"{where} references ${{{name}}}, but that environment "
+                f"variable is not set. On Databricks set it on the cluster "
+                f"(Compute > Edit > Advanced options > Spark > Environment "
+                f"variables), e.g. {name}=you@example.com. Locally, export it "
+                f"before running."
+            )
+        return resolved
+
+    return _ENV_REF.sub(substitute, str(value))
 
 
 def _resolve_against(value, root: Path) -> Path:
@@ -21,7 +50,7 @@ def _resolve_against(value, root: Path) -> Path:
     re-root it against the repo drive (C:\\Volumes\\...) instead of leaving it
     alone -- wrong, and easy to miss because the cluster itself is fine.
     """
-    text = str(value)
+    text = expand_env(value, where="path")
     path = Path(text)
     if text.startswith("/") or path.is_absolute():
         return path
@@ -63,7 +92,8 @@ class Config:
     @property
     def mlflow_experiment(self) -> str:
         m = self.raw["mlflow"]
-        return m["databricks_experiment"] if on_databricks() else m["local_experiment"]
+        key = "databricks_experiment" if on_databricks() else "local_experiment"
+        return expand_env(m[key], where=f"mlflow.{key}")
 
 
 def load_config(path: str | Path | None = None) -> Config:

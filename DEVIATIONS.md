@@ -13,8 +13,18 @@ this dataset; **open** = needs a decision from the user.
 
 ### D-00 Databricks workspace settings — *partially resolved*
 Workspace: **Equity-Silver-Databricks-MLOps** (Azure Databricks).
-MLflow experiment: `/Users/${DATABRICKS_USERNAME}/equity-silver-lstm` —
-filled in and covered by a test that fails on any unfilled placeholder.
+
+MLflow experiment: `/Users/${DATABRICKS_USERNAME}/equity-silver-lstm`. The
+workspace username is **not** stored in this repo, which is public. `${VAR}`
+references in config values are expanded from the environment at load time by
+`config.expand_env`, which raises a pointed error naming the variable if it is
+unset — deliberately not `os.path.expandvars`, which would leave a literal
+`${...}` in the path and fail confusingly later.
+
+Set it once on the cluster: **Compute > Edit > Advanced options > Spark >
+Environment variables**, `DATABRICKS_USERNAME=you@example.com`. The same
+mechanism works for `paths.databricks` if you would rather not commit the
+catalog and schema either.
 
 **Still outstanding:** the Unity Catalog `<catalog>` and `<schema>` for the
 Volume holding the raw data. Until those are supplied, `paths.databricks`
