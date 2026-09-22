@@ -55,9 +55,18 @@ locally and on the cluster with no edits.
 
 ## 1. Cluster
 
-Single node, CPU only, Databricks Runtime **ML (LTS)** — PyTorch and MLflow
-are preinstalled. The model has about 500 parameters, so no GPU and no Spark
-parallelism are needed. Install `openpyxl` if the runtime lacks it.
+**The runtime must be a Databricks Runtime ML build.** PyTorch and MLflow ship
+only with ML runtimes; a standard runtime of the same version does not have
+them, and the preflight will fail with `torch not installed` and
+`mlflow not installed`.
+
+Create the cluster as: single node, CPU only, and under **Databricks Runtime
+version** pick an entry labelled **ML**, e.g. `16.4 LTS ML`. ML builds tag
+themselves in `DATABRICKS_RUNTIME_VERSION` — `16.4.x-cpu-ml-scala2.12` rather
+than `16.4.x-scala2.12` — which is how `00a_cluster_preflight` detects this.
+
+The model has about 500 parameters, so no GPU and no Spark parallelism are
+needed. Install `openpyxl` if the runtime lacks it.
 
 Set one cluster environment variable
 (**Compute > Edit > Advanced options > Spark > Environment variables**):

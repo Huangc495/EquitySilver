@@ -54,6 +54,21 @@ def _check(area: str, name: str, ok: bool, detail: str,
     return Check(area, name, status, detail)
 
 
+def runtime_version() -> str:
+    return os.environ.get("DATABRICKS_RUNTIME_VERSION", "")
+
+
+def is_ml_runtime() -> bool:
+    """True for a Databricks Runtime **ML** build.
+
+    ML runtimes tag themselves in the version string, e.g.
+    "16.4.x-cpu-ml-scala2.12" against a standard "16.4.x-scala2.12". Only the
+    ML builds ship PyTorch and MLflow, so this single fact explains both of
+    the package failures that otherwise appear unrelated.
+    """
+    return "-ml" in runtime_version().lower()
+
+
 def check_environment(cfg: Config) -> list:
     """Where are we running, and is the MLflow target resolvable?"""
     out = [
@@ -65,7 +80,15 @@ def check_environment(cfg: Config) -> list:
     if on_databricks():
         out.append(_check(
             "environment", "DATABRICKS_RUNTIME_VERSION", True,
-            os.environ.get("DATABRICKS_RUNTIME_VERSION", ""),
+            runtime_version(),
+        ))
+        out.append(_check(
+            "environment", "Runtime ML", is_ml_runtime(),
+            runtime_version() if is_ml_runtime() else
+            f"'{runtime_version()}' is a standard runtime, not ML - "
+            "PyTorch and MLflow are missing because of this. "
+            "Compute > Edit > Databricks Runtime version > pick an entry "
+            "labelled 'ML', e.g. 16.4 LTS ML.",
         ))
     try:
         out.append(Check("environment", "mlflow experiment", OK,
@@ -143,7 +166,13 @@ def check_packages(cfg: Config) -> list:
         try:
             installed = md.version(name)
         except md.PackageNotFoundError:
-            out.append(Check("packages", name, FAIL, "not installed"))
+            detail = "not installed"
+            # torch and mlflow ship only with Runtime ML, so name the real
+            # cause rather than leaving two failures looking unrelated.
+            if name in ("torch", "mlflow") and on_databricks() and not is_ml_runtime():
+                detail = ("not installed - this cluster is not a Runtime ML "
+                          "build; see the 'Runtime ML' row above")
+            out.append(Check("packages", name, FAIL, detail))
             continue
 
         pinned = required.get(name.lower())

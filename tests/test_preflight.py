@@ -286,3 +286,73 @@ def test_search_explains_when_nothing_is_found(capsys):
     assert "SEARCHING EVERY STORAGE AREA" in out
     if not Path("/Volumes").is_dir():
         assert "run this on the cluster" in out
+
+
+# --- Runtime ML detection -------------------------------------------------
+
+def test_ml_runtime_detected_from_the_version_string(monkeypatch):
+    from acidity_lstm.preflight import is_ml_runtime
+
+    for version in ("16.4.x-cpu-ml-scala2.12", "15.4.x-gpu-ml-scala2.12",
+                    "14.3.x-cpu-ml-scala2.12"):
+        monkeypatch.setenv(DATABRICKS_ENV, version)
+        assert is_ml_runtime(), version
+
+    for version in ("16.4.x-scala2.12", "15.4.x-photon-scala2.12", ""):
+        monkeypatch.setenv(DATABRICKS_ENV, version)
+        assert not is_ml_runtime(), version
+
+
+def test_standard_runtime_fails_with_the_fix(cfg, monkeypatch):
+    """The single cause behind 'torch not installed' and 'mlflow not installed'."""
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4.x-scala2.12")
+    monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
+
+    checks = check_environment(cfg)
+    assert status_of(checks, "Runtime ML") == FAIL
+    detail = next(c.detail for c in checks if c.name == "Runtime ML")
+    assert "not ML" in detail
+    assert "Databricks Runtime version" in detail
+
+
+def test_ml_runtime_passes(cfg, monkeypatch):
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4.x-cpu-ml-scala2.12")
+    monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
+    assert status_of(check_environment(cfg), "Runtime ML") == OK
+
+
+def test_missing_torch_points_at_the_runtime(cfg, monkeypatch):
+    from acidity_lstm import preflight
+
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4.x-scala2.12")
+
+    def absent(name):
+        if name in ("torch", "mlflow"):
+            raise preflight.md.PackageNotFoundError(name)
+        return "1.0.0"
+
+    monkeypatch.setattr(preflight.md, "version", absent)
+    checks = check_packages(cfg)
+    for name in ("torch", "mlflow"):
+        assert status_of(checks, name) == FAIL
+        assert "Runtime ML" in next(c.detail for c in checks if c.name == name)
+
+
+def test_missing_package_off_cluster_stays_plain(cfg, monkeypatch):
+    """Locally there is no runtime to blame, so keep the message simple."""
+    from acidity_lstm import preflight
+
+    monkeypatch.delenv(DATABRICKS_ENV, raising=False)
+
+    def absent(name):
+        if name == "torch":
+            raise preflight.md.PackageNotFoundError(name)
+        return "1.0.0"
+
+    monkeypatch.setattr(preflight.md, "version", absent)
+    assert next(c.detail for c in check_packages(cfg) if c.name == "torch") == "not installed"
+
+
+def test_runtime_check_absent_when_local(cfg, monkeypatch):
+    monkeypatch.delenv(DATABRICKS_ENV, raising=False)
+    assert not any(c.name == "Runtime ML" for c in check_environment(cfg))
