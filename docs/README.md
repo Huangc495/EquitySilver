@@ -107,6 +107,7 @@ order. Each adds `src/` to `sys.path` itself.
 
 | Notebook | Phase | Writes |
 |---|---|---|
+| `00a_cluster_preflight` | - | nothing; checks the environment and data |
 | `00_data_audit` | 0-2 | `reports/00_data_audit.md`, `02_sample_counts.md`, parquet |
 | `01_parametric_study` | 6 | `reports/table1.md`, Figs 6-7 |
 | `02_fc_baseline` | 7 | `reports/fc_baseline.md` |
@@ -116,7 +117,12 @@ order. Each adds `src/` to `sys.path` itself.
 | `06_replication_report` | 11 | `reports/replication_report.md` |
 
 Runs log to `/Users/${DATABRICKS_USERNAME}/equity-silver-lstm` in MLflow.
-`00_data_audit` must run first: it writes the processed parquet the rest read.
+
+Run **`00a_cluster_preflight` first**. It changes nothing and verifies the
+environment variable, the uploaded data and the installed packages in one
+pass, failing with a clear message rather than letting a notebook break
+part-way through. `00_data_audit` must then run before the rest: it writes
+the processed parquet they read.
 
 ## 5. Check it first
 

@@ -116,7 +116,7 @@ On held-out data alone the baseline still wins at C7, so this is not purely a se
 
 ## Every deviation and its likely effect
 
-34 entries, parsed directly from `DEVIATIONS.md` so the two cannot drift apart. Full reasoning for each is in that file.
+35 entries, parsed directly from `DEVIATIONS.md` so the two cannot drift apart. Full reasoning for each is in that file.
 
 | id   | deviation                                                           | status                        | likely effect                                                                                                                |
 |------|---------------------------------------------------------------------|-------------------------------|------------------------------------------------------------------------------------------------------------------------------|
@@ -151,6 +151,7 @@ On held-out data alone the baseline still wins at C7, so this is not purely a se
 | D-28 | The headline forecast MSE is the best of a wide spread              | open caveat                   | Material for reading the forecast. The headline is the best of five; a typical run is about twice the paper's value.         |
 | D-29 | The time tag genuinely extrapolates in Phase 9                      | active, quantified            | Material for trusting the forecast. The tag is unconstrained outside its training range.                                     |
 | D-30 | POSIX-absolute config paths were re-rooted on Windows               | fixed                         | None on any reported result; every number came from the local path set. Fixed, with a regression test.                       |
+| D-31 | A preflight notebook was added                                      | active, extension             | None on results. Catches cluster-only setup faults before they surface mid-pipeline, and closes D-01 from the cluster.       |
 | Q-01 | Type B loses about half the samples                                 | open, quantified in Phase 6   | Moderate. ~185 Type B samples make every metric noisy; run-to-run SD exceeds our mean gap to the paper.                      |
 | Q-02 | Type B is a strict subset of Type A                                 | resolved in Phase 6           | None, once tested. Type B still beats Type A on identical samples.                                                           |
 | Q-03 | Whole-year blocked splits are not directly possible                 | resolved in Phase 5, see D-13 | Resolved in D-13.                                                                                                            |
@@ -164,7 +165,7 @@ On held-out data alone the baseline still wins at C7, so this is not purely a se
 | Config    | `configs/base.yaml` (every setting and seed)                                              |
 | Base seed | 42                                                                                        |
 | Repeats   | 5                                                                                         |
-| Tests     | `pytest` - 219 test functions across 11 files (more cases once parametrised tests expand) |
+| Tests     | `pytest` - 237 test functions across 12 files (more cases once parametrised tests expand) |
 | MLflow    | equity-silver-lstm                                                                        |
 | Reports   | `reports/` - audit, sample counts, Table 1, FC baseline, time tag, forecast, this report  |
 

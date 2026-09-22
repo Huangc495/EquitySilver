@@ -42,9 +42,10 @@ cluster, so `tests/test_config.py` now asserts the cluster paths are
 well-formed volume paths: four segments, a bare schema name, and never
 `information_schema`.
 
-**Still outstanding:** nothing blocking. The raw data must be uploaded to the
-`raw` volume once, and `requirements.txt` still needs confirming against the
-cluster (D-01).
+**Volumes created and raw data uploaded** by the user. Not verifiable from
+the development machine (no Databricks CLI or credentials there), so
+`notebooks/00a_cluster_preflight.py` checks it on the cluster instead — see
+D-31.
 
 ### D-01 Dependency pins are not yet confirmed against the cluster — *open*
 `CLAUDE.md` says to pin `requirements.txt` from `pip freeze` on the Databricks
@@ -499,7 +500,8 @@ username.
 `Config.resolve` used `Path.is_absolute()` to decide whether to join a
 configured path to the repo root. On Windows a bare leading slash is **not**
 absolute, so `/Volumes/<catalog>/<schema>/raw` silently became
-`C:\Volumes\<catalog>\<schema>aw` — re-rooted onto the repo's drive.
+`C:\Volumes\<catalog>\<schema>
+aw` — re-rooted onto the repo's drive.
 
 The cluster itself was never affected (Linux treats the path as absolute), so
 this would only ever have surfaced as a confusing failure when simulating or
@@ -510,3 +512,22 @@ now treats a leading "/" as absolute on every platform.
 from the local path set. Covered by `tests/test_config.py`, including a
 regression test for the re-rooting and one that fails if any `<placeholder>`
 remains in the MLflow experiment path.
+
+
+### D-31 A preflight notebook was added — *active, extension*
+Not in the `CLAUDE.md` layout. Added because three things can only be
+confirmed on the cluster, and each otherwise fails part-way through a notebook
+with a misleading error: `DATABRICKS_USERNAME` unset, raw data missing or
+partially uploaded to the Volume, and packages disagreeing with
+`requirements.txt`.
+
+`notebooks/00a_cluster_preflight.py` and `preflight.py` check all three,
+change nothing, and are safe to re-run. Failures are hard (missing data,
+unresolvable config); version disagreements are warnings, since on a cluster
+the runtime's own version is the one to trust.
+
+`preflight.environment_report()` prints the installed versions as a
+requirements block, which is how **D-01** gets closed from the cluster itself.
+
+**Effect:** none on results. 17 tests, mostly driving the failure paths — a
+preflight that cannot fail is worthless.

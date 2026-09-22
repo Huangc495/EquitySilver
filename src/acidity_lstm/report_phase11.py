@@ -56,6 +56,7 @@ LIKELY_EFFECT = {
     "D-28": "Material for reading the forecast. The headline is the best of five; a typical run is about twice the paper's value.",
     "D-29": "Material for trusting the forecast. The tag is unconstrained outside its training range.",
     "D-30": "None on any reported result; every number came from the local path set. Fixed, with a regression test.",
+    "D-31": "None on results. Catches cluster-only setup faults before they surface mid-pipeline, and closes D-01 from the cluster.",
     "Q-01": "Moderate. ~185 Type B samples make every metric noisy; run-to-run SD exceeds our mean gap to the paper.",
     "Q-02": "None, once tested. Type B still beats Type A on identical samples.",
     "Q-03": "Resolved in D-13.",
