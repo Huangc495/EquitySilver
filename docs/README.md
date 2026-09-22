@@ -44,6 +44,18 @@ code rather than quoted from the paper:
 See `reports/replication_report.md` for the results and `DEVIATIONS.md` for
 every departure from the paper.
 
+## Codebase map
+
+`docs/architecture.html` is an interactive dependency map: all 17 library
+modules in call-order layers, which one imports which, the real call chain
+behind a parametric-study run, and a table of every module's responsibility
+and entry points. Open it in a browser.
+
+The edges are extracted from the source with `ast` rather than drawn by hand,
+so the map cannot quietly drift from the code. `config` is drawn as a
+foundation bar rather than with sixteen edges into it, since every module
+imports it.
+
 ---
 
 # Running on Databricks

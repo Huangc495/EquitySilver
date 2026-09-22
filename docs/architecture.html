@@ -1,0 +1,608 @@
+<title>Acidity LSTM Codebase Map</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  :root{
+    --ground:#f1f5f6;
+    --surface:#ffffff;
+    --surface-2:#e7eef0;
+    --line:#ccdade;
+    --line-strong:#a8bcc4;
+    --ink:#12222b;
+    --muted:#596d77;
+    --accent:#a94e18;
+    --accent-ink:#8c400f;
+
+    --l-entry:#a94e18;
+    --l-report:#77654e;
+    --l-orch:#2c5a79;
+    --l-model:#474b89;
+    --l-core:#256b5e;
+    --l-config:#596d77;
+
+    --edge:#7d949d;
+    --shadow:0 1px 2px rgba(18,34,43,.06),0 4px 14px rgba(18,34,43,.05);
+    --radius:7px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0e1418;
+      --surface:#161f25;
+      --surface-2:#1d272e;
+      --line:#2a3841;
+      --line-strong:#3c4d57;
+      --ink:#e2ecef;
+      --muted:#93a7b1;
+      --accent:#e39154;
+      --accent-ink:#f0a869;
+
+      --l-entry:#e39154;
+      --l-report:#c0a583;
+      --l-orch:#6ba3cb;
+      --l-model:#9095dd;
+      --l-core:#57b39f;
+      --l-config:#93a7b1;
+
+      --edge:#5d7883;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.24);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0e1418; --surface:#161f25; --surface-2:#1d272e;
+    --line:#2a3841; --line-strong:#3c4d57; --ink:#e2ecef; --muted:#93a7b1;
+    --accent:#e39154; --accent-ink:#f0a869;
+    --l-entry:#e39154; --l-report:#c0a583; --l-orch:#6ba3cb;
+    --l-model:#9095dd; --l-core:#57b39f; --l-config:#93a7b1;
+    --edge:#5d7883;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.24);
+  }
+
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+    font-size:15px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1300px;margin:0 auto;padding-inline:20px;padding-block:44px 72px;}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;}
+
+  /* ---- masthead ---- */
+  header.mast{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:34px;}
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 12px;
+  }
+  h1{
+    font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;
+    font-size:clamp(28px,4.4vw,42px);line-height:1.12;margin:0 0 14px;
+    letter-spacing:-.015em;text-wrap:balance;
+  }
+  .standfirst{
+    font-family:"IBM Plex Serif",Georgia,serif;font-size:17px;line-height:1.6;
+    color:var(--muted);max-width:66ch;margin:0;
+  }
+  .facts{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:20px;}
+  .fact{font-size:13px;color:var(--muted);}
+  .fact b{
+    color:var(--ink);font-family:"IBM Plex Mono",monospace;font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+
+  h2{
+    font-family:"IBM Plex Sans",sans-serif;font-size:13px;font-weight:600;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    margin:48px 0 6px;
+  }
+  .h2-note{font-size:14px;color:var(--muted);margin:0 0 18px;max-width:72ch;}
+
+  /* ---- diagram ---- */
+  .panel{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow);
+  }
+  .toolbar{
+    display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+    padding:12px 14px;border-bottom:1px solid var(--line);
+  }
+  .focus-label{font-size:13px;color:var(--muted);margin-right:auto;}
+  .focus-label b{color:var(--ink);font-family:"IBM Plex Mono",monospace;font-weight:600;}
+  button{
+    font:inherit;font-size:12.5px;padding:5px 11px;cursor:pointer;
+    background:var(--surface-2);color:var(--ink);
+    border:1px solid var(--line-strong);border-radius:5px;
+  }
+  button:hover{border-color:var(--accent);color:var(--accent-ink);}
+  button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button:focus-visible,g.node:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .scroller{overflow-x:auto;padding:4px 0 10px;}
+  svg.map{display:block;width:1240px;max-width:none;margin:0 auto;height:auto;}
+
+  .band-label{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.13em;
+    text-transform:uppercase;fill:var(--muted);
+    /* halo so edges passing behind the label do not cut through it */
+    paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;
+  }
+  .band-rule{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4;}
+  g.node{cursor:pointer;}
+  g.node rect{fill:var(--surface);stroke-width:1.4;transition:opacity .15s,fill .15s;}
+  g.node .nm{
+    font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500;
+    fill:var(--ink);text-anchor:middle;pointer-events:none;
+  }
+  g.node .sub{
+    font-family:"IBM Plex Sans",sans-serif;font-size:9.5px;fill:var(--muted);
+    text-anchor:middle;pointer-events:none;letter-spacing:.02em;
+  }
+  g.node .rail{stroke-width:3.5;stroke-linecap:round;}
+  path.edge{fill:none;stroke:var(--edge);stroke-width:1.1;opacity:.13;transition:opacity .15s,stroke .15s,stroke-width .15s;}
+  path.edge.out{stroke:var(--accent);stroke-width:1.9;opacity:.95;}
+  path.edge.in{stroke:var(--l-orch);stroke-width:1.6;opacity:.7;stroke-dasharray:4 3;}
+  .showall path.edge{opacity:.32;}
+  g.node.dim{opacity:.32;}
+  g.node.sel rect{stroke-width:2.6;}
+  g.node.sel .nm{font-weight:600;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:6px 20px;padding:12px 14px;border-top:1px solid var(--line);}
+  .lg{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
+  .sw{width:13px;height:3.5px;border-radius:2px;flex:none;}
+  .lg-line{width:20px;height:0;border-top-width:2px;border-top-style:solid;flex:none;}
+
+  /* ---- call chain ---- */
+  .chain{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:20px 8px 20px 20px;overflow-x:auto;
+  }
+  .chain ol{list-style:none;margin:0;padding:0;font-family:"IBM Plex Mono",monospace;font-size:12.5px;}
+  .chain li{padding:2.5px 0;white-space:nowrap;color:var(--ink);}
+  .chain .ind{color:var(--line-strong);user-select:none;}
+  .chain .mod{color:var(--muted);}
+  .chain .fn{font-weight:500;}
+  .chain .note{
+    font-family:"IBM Plex Sans",sans-serif;color:var(--muted);font-size:11.5px;
+    font-style:italic;margin-left:8px;
+  }
+  .chain .hot{color:var(--accent-ink);font-weight:600;}
+
+  /* ---- tables ---- */
+  .tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow);}
+  table{border-collapse:collapse;width:100%;min-width:660px;font-size:13.5px;}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{
+    font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+    font-weight:600;background:var(--surface-2);position:sticky;top:0;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  td.mono{font-weight:500;white-space:nowrap;}
+  td.num{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;white-space:nowrap;}
+  .tag{
+    display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    padding:1.5px 7px;border-radius:20px;border:1px solid currentColor;white-space:nowrap;
+  }
+  .api{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);}
+
+  footer{margin-top:54px;padding-top:20px;border-top:1px solid var(--line);
+    font-size:13px;color:var(--muted);max-width:74ch;}
+  footer a{color:var(--accent-ink);}
+
+  @media (max-width:640px){
+    .wrap{padding-block:30px 56px;}
+    .facts{gap:6px 18px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;}
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="eyebrow">Equity Silver · acidity_lstm</p>
+    <h1>Acidity LSTM Codebase Map</h1>
+    <p class="standfirst">
+      Every module in the replication of Ma et&nbsp;al. (2021), and which one calls which.
+      Weather and drainage chemistry enter at the bottom of the stack and leave as
+      Table&nbsp;1; the notebooks on top are the only things a person runs.
+    </p>
+    <div class="facts">
+      <span class="fact"><b>17</b> library modules</span>
+      <span class="fact"><b>8</b> notebooks</span>
+      <span class="fact"><b>4,712</b> lines of library code</span>
+      <span class="fact"><b>264</b> tests</span>
+      <span class="fact"><b>11</b> phases</span>
+    </div>
+  </header>
+
+  <h2>Dependency map</h2>
+  <p class="h2-note">
+    Click any module to trace it. Solid rust lines are what it <em>imports</em>;
+    dashed blue lines are what imports <em>it</em>. Layers run top to bottom in
+    call order, so every arrow points downward into the layer it depends on.
+  </p>
+
+  <div class="panel">
+    <div class="toolbar">
+      <span class="focus-label">Tracing <b id="focusName">experiments</b> <span id="focusCount"></span></span>
+      <button id="btnAll" aria-pressed="false">Show every dependency</button>
+      <button id="btnReset">Reset</button>
+    </div>
+    <div class="scroller">
+      <svg class="map" id="map" viewBox="0 0 1240 760" role="img"
+           aria-label="Layered dependency diagram of the acidity_lstm package"></svg>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <h2>How one run actually executes</h2>
+  <p class="h2-note">
+    The real call chain behind <code>01_parametric_study</code> — the parametric study that
+    produces Table&nbsp;1. This is a genuine sequence, so it is numbered by depth rather than
+    by step: each indent is one stack frame down.
+  </p>
+  <div class="chain" id="chain"></div>
+
+  <h2>The 17 modules</h2>
+  <p class="h2-note">
+    Ordered by layer, foundation last. Public entry points only — private helpers are omitted.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Layer</th><th class="num">Lines</th><th>Responsibility</th><th>Entry points</th></tr>
+      </thead>
+      <tbody id="modTable"></tbody>
+    </table>
+  </div>
+
+  <h2>Notebook to library</h2>
+  <p class="h2-note">
+    What each notebook calls, and which phase of <code>CLAUDE.md</code> it delivers.
+    Run order is top to bottom; <code>00_data_audit</code> writes the parquet the rest read.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Notebook</th><th>Phase</th><th>Calls</th><th>Produces</th></tr>
+      </thead>
+      <tbody id="nbTable"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p><strong>One simplification.</strong> <code>config</code> is drawn as a foundation bar
+    rather than with 16 edges running into it, because every module imports it — showing
+    those lines would obscure the structure without adding information. Every other edge on
+    the diagram is a real <code>from . import</code> extracted from the source with
+    <code>ast</code>, not drawn by hand.</p>
+    <p>Generated from the repository at
+    <a href="https://github.com/Huangc495/EquitySilver">github.com/Huangc495/EquitySilver</a>.
+    See <code>reports/replication_report.md</code> for results and <code>DEVIATIONS.md</code>
+    for every departure from the paper.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var LAYERS = [
+    {id:"entry",  label:"Notebooks · what you run",            color:"--l-entry",  y:64,  h:44, w:128},
+    {id:"report", label:"Reporting · markdown and figures",    color:"--l-report", y:196, h:46, w:150},
+    {id:"orch",   label:"Orchestration · grids, repeats, MLflow", color:"--l-orch", y:326, h:52, w:300},
+    {id:"model",  label:"Modelling · network, training, metrics", color:"--l-model", y:448, h:48, w:220},
+    {id:"core",   label:"Core pipeline · read, clean, window, scale, split", color:"--l-core", y:566, h:48, w:200},
+    {id:"config", label:"Foundation",                          color:"--l-config", y:682, h:46, w:460}
+  ];
+
+  var NODES = [
+    {id:"nb00a", layer:"entry", name:"00a", sub:"preflight"},
+    {id:"nb00",  layer:"entry", name:"00",  sub:"data audit"},
+    {id:"nb01",  layer:"entry", name:"01",  sub:"parametric"},
+    {id:"nb02",  layer:"entry", name:"02",  sub:"fc baseline"},
+    {id:"nb03",  layer:"entry", name:"03",  sub:"time tag"},
+    {id:"nb04",  layer:"entry", name:"04",  sub:"forecast"},
+    {id:"nb05",  layer:"entry", name:"05",  sub:"sensitivity"},
+    {id:"nb06",  layer:"entry", name:"06",  sub:"replication"},
+
+    {id:"preflight",       layer:"report", name:"preflight",    sub:"cluster checks"},
+    {id:"audit",           layer:"report", name:"audit",        sub:"phases 0–2"},
+    {id:"report_phase6",   layer:"report", name:"report_phase6",sub:"Table 1"},
+    {id:"report_phase7",   layer:"report", name:"report_phase7",sub:"baseline"},
+    {id:"report_phase8",   layer:"report", name:"report_phase8",sub:"time tag"},
+    {id:"report_phase910", layer:"report", name:"report_ph910", sub:"Figs 11–12"},
+    {id:"report_phase11",  layer:"report", name:"report_ph11",  sub:"final report"},
+
+    {id:"experiments", layer:"orch", name:"experiments", sub:"grid · variants · MLflow"},
+    {id:"forecast",    layer:"orch", name:"forecast",    sub:"phases 9–10"},
+
+    {id:"models",   layer:"model", name:"models",   sub:"LSTM · FC baseline"},
+    {id:"train",    layer:"model", name:"train",    sub:"SGDM loop"},
+    {id:"evaluate", layer:"model", name:"evaluate", sub:"MSE · R · figures"},
+
+    {id:"io",         layer:"core", name:"io",         sub:"CSV · xlsx"},
+    {id:"preprocess", layer:"core", name:"preprocess", sub:"clean"},
+    {id:"windows",    layer:"core", name:"windows",    sub:"Type A / B"},
+    {id:"splits",     layer:"core", name:"splits",     sub:"train/val/test"},
+    {id:"scaling",    layer:"core", name:"scaling",    sub:"z-score"},
+
+    {id:"config", layer:"config", name:"config", sub:"imported by every module · local vs Databricks paths"}
+  ];
+
+  // Real `from . import` edges, extracted with ast. config edges omitted (see footer).
+  var EDGES = [
+    ["nb00a","preflight"],
+    ["nb00","audit"],["nb00","preprocess"],
+    ["nb01","experiments"],["nb01","preprocess"],["nb01","report_phase6"],
+    ["nb02","experiments"],["nb02","preprocess"],["nb02","report_phase7"],
+    ["nb03","experiments"],["nb03","preprocess"],["nb03","report_phase8"],
+    ["nb04","experiments"],["nb04","forecast"],["nb04","preprocess"],["nb04","report_phase910"],
+    ["nb05","forecast"],["nb05","preprocess"],["nb05","report_phase910"],
+    ["nb06","experiments"],["nb06","forecast"],["nb06","preprocess"],["nb06","report_phase11"],
+
+    ["audit","io"],["audit","preprocess"],["audit","windows"],
+    ["report_phase6","audit"],["report_phase6","evaluate"],["report_phase6","experiments"],
+    ["report_phase7","audit"],["report_phase7","evaluate"],["report_phase7","experiments"],
+    ["report_phase8","audit"],["report_phase8","evaluate"],["report_phase8","experiments"],
+    ["report_phase910","audit"],["report_phase910","evaluate"],["report_phase910","forecast"],
+    ["report_phase11","audit"],["report_phase11","experiments"],["report_phase11","forecast"],
+
+    ["experiments","evaluate"],["experiments","preprocess"],["experiments","scaling"],
+    ["experiments","splits"],["experiments","train"],["experiments","windows"],
+    ["forecast","evaluate"],["forecast","experiments"],["forecast","scaling"],
+    ["forecast","splits"],["forecast","train"],["forecast","windows"],
+
+    ["train","evaluate"],["train","models"],["train","scaling"],["train","splits"],
+    ["evaluate","scaling"],["evaluate","splits"],
+
+    ["preprocess","io"]
+  ];
+
+  var MODULES = [
+    ["preflight","report",462,"Environment, data and package checks before anything runs. Recognises serverless and non-ML runtimes.","run_preflight, diagnose_volumes, environment_report"],
+    ["audit","report",663,"Phase 0 data audit and the Phase 2 sample counts, plus the shared markdown table renderer.","run_audit, run_sample_count_report"],
+    ["report_phase6","report",437,"Table 1 against the paper, Figs 6–7, and the robustness variants.","make_figures, write_table1"],
+    ["report_phase7","report",296,"Fully connected baseline versus the LSTM, with held-out metrics.","make_figure, write_report"],
+    ["report_phase8","report",336,"Refined time-tag model, Figs 9–10, both tag encodings.","make_figures, write_report"],
+    ["report_phase910","report",443,"Two-year forecast and ±20% weather sensitivity, Figs 11–12.","make_forecast_figures, make_sensitivity_figure, write_report"],
+    ["report_phase11","report",587,"Final replication report. Parses DEVIATIONS.md so the two cannot drift apart.","write_report, parse_deviations"],
+    ["experiments","orch",480,"Scenario grids, the four variants, best-of-5 selection and all MLflow logging.","run_parametric_study, run_variant, run_cell, run_fc_baseline, run_refined"],
+    ["forecast","orch",322,"Phases 9–10. Training-period scaler, time-based split, weather perturbation.","run_forecast, run_sensitivity, perturb_weather"],
+    ["models","model",215,"LSTMRegressor and FCBaseline with MATLAB-style initialisation.","LSTMRegressor, FCBaseline, build_model, set_seed"],
+    ["train","model",273,"SGDM loop reproducing trainNetwork defaults: LR drop, early stopping, repeats.","train_model, train_repeats, best_of, summarise_repeats"],
+    ["evaluate","model",258,"MSE, Pearson R, RMSE in mg/L, and the scatter and time-series figures.","evaluate_model, pearson_r, scatter_measured_vs_calculated"],
+    ["io","core",139,"Reads the 21 Environment Canada CSVs and the two-sheet acidity workbook.","read_weather_raw, read_acidity_raw"],
+    ["preprocess","core",160,"Daily calendar reindex, flag handling, duplicate policy. Never imputes.","clean_weather, clean_acidity, build_processed"],
+    ["windows","core",321,"Type A and Type B lookback windows and the day-number time tag.","build_samples, build_sample_sets, SampleSet"],
+    ["splits","core",188,"Train/val/test assignment, random or blocked by whole calendar years.","assign_splits, random_split, blocked_split"],
+    ["scaling","core",163,"Z-score normalisation with population std, and the inverse transform.","fit_scaler, fit_scaler_for, Scaler"],
+    ["config","config",149,"YAML loading, local versus Databricks paths, ${VAR} expansion.","load_config, on_databricks, expand_env"]
+  ];
+
+  var NOTEBOOKS = [
+    ["00a_cluster_preflight","—","preflight","Nothing. Verifies the cluster."],
+    ["00_data_audit","0–2","audit, preprocess","00_data_audit.md, 02_sample_counts.md, parquet"],
+    ["01_parametric_study","6","experiments, report_phase6","table1.md, Figs 6–7"],
+    ["02_fc_baseline","7","experiments, report_phase7","fc_baseline.md"],
+    ["03_refined_timetag","8","experiments, report_phase8","refined_timetag.md, Figs 9–10"],
+    ["04_forecast","9–10","forecast, report_phase910","forecast_sensitivity.md, Figs 11–12"],
+    ["05_sensitivity","10","forecast, report_phase910","Fig. 12 alone"],
+    ["06_replication_report","11","all of the above, report_phase11","replication_report.md"]
+  ];
+
+  var LAYER_OF = {}, NODE_OF = {};
+  NODES.forEach(function(n){ NODE_OF[n.id] = n; });
+  LAYERS.forEach(function(l){ LAYER_OF[l.id] = l; });
+
+  // ---- layout: distribute each layer's nodes evenly across the canvas ----
+  var W = 1240, PAD = 30, USABLE = W - PAD*2;
+  LAYERS.forEach(function(layer){
+    var members = NODES.filter(function(n){ return n.layer === layer.id; });
+    var n = members.length;
+    var total = n * layer.w;
+    var gap = n > 1 ? (USABLE - total) / (n - 1) : 0;
+    var startX = n > 1 ? PAD : PAD + (USABLE - layer.w) / 2;
+    members.forEach(function(m, i){
+      m.x = startX + i * (layer.w + gap);
+      m.y = layer.y;
+      m.w = layer.w;
+      m.h = layer.h;
+      m.cx = m.x + m.w / 2;
+      m.color = "var(" + layer.color + ")";
+    });
+  });
+
+  var svg = document.getElementById("map");
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs){
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // band rules first; their labels are drawn last so edges cannot cut through them
+  LAYERS.forEach(function(l){
+    svg.appendChild(el("line", {x1:PAD, y1:l.y - 6, x2:W - PAD, y2:l.y - 6, "class":"band-rule"}));
+  });
+
+  // edges: cubic curve from source bottom to target top
+  var edgeEls = [];
+  EDGES.forEach(function(pair){
+    var a = NODE_OF[pair[0]], b = NODE_OF[pair[1]];
+    if (!a || !b) return;
+    var x1 = a.cx, y1 = a.y + a.h, x2 = b.cx, y2 = b.y;
+    var dy = Math.max(26, (y2 - y1) * 0.45);
+    var d = "M" + x1 + "," + y1 + " C" + x1 + "," + (y1 + dy) + " " + x2 + "," + (y2 - dy) + " " + x2 + "," + y2;
+    var p = el("path", {"class":"edge", d:d});
+    p.dataset.from = pair[0];
+    p.dataset.to = pair[1];
+    svg.appendChild(p);
+    edgeEls.push(p);
+  });
+
+  // nodes
+  var nodeEls = {};
+  NODES.forEach(function(nd){
+    var g = el("g", {"class":"node", tabindex:"0", role:"button",
+                     "aria-label":nd.name + " — " + nd.sub});
+    g.dataset.id = nd.id;
+    g.appendChild(el("rect", {x:nd.x, y:nd.y, width:nd.w, height:nd.h,
+                              rx:5, stroke:nd.color}));
+    g.appendChild(el("line", {x1:nd.x + 2.5, y1:nd.y + 7, x2:nd.x + 2.5, y2:nd.y + nd.h - 7,
+                              stroke:nd.color, "class":"rail"}));
+    var t1 = el("text", {x:nd.cx, y:nd.y + (nd.sub ? 20 : 27), "class":"nm"});
+    t1.textContent = nd.name;
+    g.appendChild(t1);
+    if (nd.sub){
+      var t2 = el("text", {x:nd.cx, y:nd.y + 33, "class":"sub"});
+      t2.textContent = nd.sub;
+      g.appendChild(t2);
+    }
+    svg.appendChild(g);
+    nodeEls[nd.id] = g;
+
+    g.addEventListener("click", function(){ focus(nd.id); });
+    g.addEventListener("mouseenter", function(){ if (!showAll) focus(nd.id); });
+    g.addEventListener("keydown", function(ev){
+      if (ev.key === "Enter" || ev.key === " "){ ev.preventDefault(); focus(nd.id); }
+    });
+  });
+
+  // band labels on top of the edge web
+  LAYERS.forEach(function(l){
+    var t = el("text", {x:PAD, y:l.y - 11, "class":"band-label"});
+    t.textContent = l.label;
+    svg.appendChild(t);
+  });
+
+  // ---- focus behaviour ----
+  var showAll = false, current = "experiments";
+  var focusName = document.getElementById("focusName");
+  var focusCount = document.getElementById("focusCount");
+
+  function focus(id){
+    current = id;
+    var related = {};
+    related[id] = true;
+    var nOut = 0, nIn = 0;
+
+    edgeEls.forEach(function(p){
+      p.classList.remove("out", "in");
+      if (p.dataset.from === id){ p.classList.add("out"); related[p.dataset.to] = true; nOut++; }
+      else if (p.dataset.to === id){ p.classList.add("in"); related[p.dataset.from] = true; nIn++; }
+    });
+
+    NODES.forEach(function(nd){
+      var g = nodeEls[nd.id];
+      g.classList.toggle("dim", !showAll && !related[nd.id]);
+      g.classList.toggle("sel", nd.id === id);
+    });
+
+    var nd = NODE_OF[id];
+    focusName.textContent = nd.name;
+    focusCount.textContent = "· imports " + nOut + " · imported by " + nIn;
+  }
+
+  function setShowAll(on){
+    showAll = on;
+    svg.parentElement.classList.toggle("showall", on);
+    document.getElementById("btnAll").setAttribute("aria-pressed", String(on));
+    focus(current);
+  }
+
+  document.getElementById("btnAll").addEventListener("click", function(){ setShowAll(!showAll); });
+  document.getElementById("btnReset").addEventListener("click", function(){
+    setShowAll(false);
+    focus("experiments");
+  });
+
+  focus("experiments");
+
+  // ---- legend ----
+  var legend = document.getElementById("legend");
+  LAYERS.forEach(function(l){
+    var d = document.createElement("span");
+    d.className = "lg";
+    d.innerHTML = '<span class="sw" style="background:var(' + l.color + ')"></span>' +
+                  l.label.split(" · ")[0];
+    legend.appendChild(d);
+  });
+  [["imports","var(--accent)","solid"],["imported by","var(--l-orch)","dashed"]].forEach(function(x){
+    var d = document.createElement("span");
+    d.className = "lg";
+    d.innerHTML = '<span class="lg-line" style="border-top-color:' + x[1] +
+                  ';border-top-style:' + x[2] + '"></span>' + x[0];
+    legend.appendChild(d);
+  });
+
+  // ---- call chain ----
+  var CHAIN = [
+    [0,"01_parametric_study","","notebook"],
+    [1,"experiments","run_parametric_study",""],
+    [2,"preprocess","clean_weather / clean_acidity","→ io.read_weather_raw, read_acidity_raw"],
+    [2,"experiments","setup_mlflow","local file store or the workspace experiment"],
+    [2,"experiments","run_variant","once per variant: paper, blocked, common, fit_train"],
+    [3,"experiments","override","apply the variant's config overrides"],
+    [3,"experiments","prepare_sample_sets",""],
+    [4,"windows","make_weather_arrays","offset-indexed daily arrays"],
+    [4,"splits","eligible_years_from","blocked variant only — skips empty years"],
+    [4,"splits","assign_splits","→ random_split | blocked_split"],
+    [4,"windows","build_sample_sets","→ build_samples → _day_index_matrix, _time_tag"],
+    [3,"scaling","fit_scaler_for","→ fit_scaler · one scaler per scenario"],
+    [3,"experiments","run_cell","once per hidden size: 5, 10, 20"],
+    [4,"train","train_repeats","5 re-initialisations"],
+    [5,"train","train_model",""],
+    [6,"models","set_seed, build_model","→ LSTMRegressor | FCBaseline"],
+    [6,"scaling","transform_x, transform_y",""],
+    [6,"train","_iter_batches, _subset_mse","drop_last · early stopping on val MSE"],
+    [6,"evaluate","evaluate_model","→ predict, mse, pearson_r, rmse"],
+    [4,"train","best_of, summarise_repeats","lowest MSE over all samples"],
+    [4,"experiments","_log_scenario","one MLflow run + 5 nested runs"],
+    [1,"report_phase6","make_figures","→ evaluate.scatter_measured_vs_calculated"],
+    [1,"report_phase6","write_table1","→ audit._md_table · reports/table1.md"]
+  ];
+  var chainOl = document.createElement("ol");
+  CHAIN.forEach(function(row){
+    var li = document.createElement("li");
+    var indent = row[0];
+    var bar = "";
+    for (var i = 0; i < indent; i++) bar += (i === indent - 1 ? "└─ " : "│&nbsp;&nbsp;");
+    var isHot = row[1] === "experiments" || row[1] === "train";
+    li.innerHTML = '<span class="ind">' + bar + '</span>' +
+      '<span class="mod">' + row[1] + (row[2] ? "." : "") + '</span>' +
+      '<span class="fn' + (isHot ? " hot" : "") + '">' + row[2] + '</span>' +
+      (row[3] ? '<span class="note">' + row[3] + '</span>' : '');
+    chainOl.appendChild(li);
+  });
+  document.getElementById("chain").appendChild(chainOl);
+
+  // ---- tables ----
+  var LAYER_NAME = {report:"Reporting", orch:"Orchestration", model:"Modelling",
+                    core:"Core", config:"Foundation"};
+  var modBody = document.getElementById("modTable");
+  MODULES.forEach(function(m){
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="mono">' + m[0] + '</td>' +
+      '<td><span class="tag" style="color:var(--l-' + m[1] + ')">' + LAYER_NAME[m[1]] + '</span></td>' +
+      '<td class="num">' + m[2] + '</td>' +
+      '<td>' + m[3] + '</td>' +
+      '<td class="api">' + m[4] + '</td>';
+    modBody.appendChild(tr);
+  });
+
+  var nbBody = document.getElementById("nbTable");
+  NOTEBOOKS.forEach(function(n){
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="mono">' + n[0] + '</td>' +
+      '<td class="num">' + n[1] + '</td>' +
+      '<td class="api">' + n[2] + '</td>' +
+      '<td>' + n[3] + '</td>';
+    nbBody.appendChild(tr);
+  });
+})();
+</script>
