@@ -114,10 +114,26 @@ upload it once, into the `raw` volume:
 > to DBFS, not to a volume. `00a_cluster_preflight` searches all three and
 > tells you which one your files are actually in.
 
-## 4. Run
+## 4. Clone the repository into Databricks
 
-Clone this repository into a Databricks Git folder and run the notebooks in
-order. Each adds `src/` to `sys.path` itself.
+The notebooks are `.py` files beginning with `# Databricks notebook source`,
+so Databricks renders them as notebooks once the repo is cloned. They are not
+uploaded by hand.
+
+1. Left nav **Workspace** > your home folder (**Users > you@example.com**).
+2. **Create** (top right) > **Git folder**.
+3. Git repository URL: `https://github.com/Huangc495/EquitySilver`
+   Git provider: **GitHub**. The repository is public, so no token is needed
+   to clone and run; one is only required to push from Databricks.
+4. **Create Git folder**.
+
+You now have `/Workspace/Users/<you>/EquitySilver/` containing `notebooks/`.
+Use **Pull** in that folder to pick up later changes.
+
+## 5. Run
+
+Open a notebook, attach it to the cluster with the dropdown at the top right,
+then **Run all**. Each notebook adds `src/` to `sys.path` itself.
 
 | Notebook | Phase | Writes |
 |---|---|---|
@@ -138,7 +154,7 @@ pass, failing with a clear message rather than letting a notebook break
 part-way through. `00_data_audit` must then run before the rest: it writes
 the processed parquet they read.
 
-## 5. Check it first
+## 6. Check it first
 
 ```bash
 pytest
