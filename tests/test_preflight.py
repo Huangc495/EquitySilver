@@ -260,3 +260,29 @@ def test_diagnose_is_safe_off_cluster(cfg, capsys):
     assert "CONFIGURED" in out
     if not Path("/Volumes").is_dir():
         assert "not a Databricks cluster" in out
+
+
+def test_search_roots_only_returns_existing_paths():
+    """Off-cluster none of the Databricks roots exist, so the list is empty."""
+    from acidity_lstm.preflight import search_roots
+
+    for path, label in search_roots():
+        assert Path(path).is_dir()
+        assert label
+
+
+def test_dbfs_uri_conversion():
+    from acidity_lstm.preflight import _to_dbfs_uri
+
+    assert _to_dbfs_uri("/dbfs/FileStore/tables") == "dbfs:/FileStore/tables"
+    assert _to_dbfs_uri("/Volumes/cat/sch/raw") == "/Volumes/cat/sch/raw"
+
+
+def test_search_explains_when_nothing_is_found(capsys):
+    from acidity_lstm.preflight import _search_all_storage
+
+    _search_all_storage("mycat", "mysch")
+    out = capsys.readouterr().out
+    assert "SEARCHING EVERY STORAGE AREA" in out
+    if not Path("/Volumes").is_dir():
+        assert "run this on the cluster" in out

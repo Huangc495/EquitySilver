@@ -300,20 +300,84 @@ def diagnose_volumes(cfg: Config, search: bool = True) -> None:
                 print(f"  {row}")
 
     if search:
-        print(f"\nSEARCHING {VOLUMES_ROOT} FOR THE EXPECTED FILES")
-        hits = _find_expected(VOLUMES_ROOT)
-        if not hits:
-            print("  Not found anywhere under /Volumes.")
-            print("  If you uploaded through the workspace UI the files may be "
-                  "in DBFS (/FileStore/...) or a workspace folder rather than "
-                  "a Volume - those are different storage.")
-        else:
-            for path in hits:
-                print(f"  FOUND: {path}")
-            suggested = sorted({str(Path(p).parent) for p in hits})
-            print("\n  Update configs/base.yaml paths.databricks to match, e.g.")
-            for directory in suggested:
-                print(f"    {directory}/<file>")
+        _search_all_storage(catalog, schema)
+
+
+def search_roots() -> list:
+    """The distinct storage areas a Databricks upload can land in.
+
+    These are genuinely separate systems, which is the usual source of
+    confusion: files uploaded through one are invisible from the others.
+    Volumes do not appear in the Workspace browser, and Workspace files do
+    not appear under /Volumes.
+    """
+    import os
+
+    roots = [
+        (VOLUMES_ROOT, "Unity Catalog volumes (Catalog > catalog > schema > Volumes)"),
+        ("/dbfs/FileStore", "DBFS FileStore - where the legacy 'Upload data' UI puts files"),
+        ("/dbfs/user", "DBFS user area"),
+    ]
+    user = os.environ.get("DATABRICKS_USERNAME", "")
+    if user:
+        roots.append((f"/Workspace/Users/{user}", "your Workspace home (notebooks and files)"))
+    roots.append(("/Workspace/Shared", "Workspace shared folder"))
+    return [(path, label) for path, label in roots if os.path.isdir(path)]
+
+
+def _search_all_storage(catalog: str = "", schema: str = "") -> None:
+    """Hunt for the raw files across every storage area, not just Volumes."""
+    print("\nSEARCHING EVERY STORAGE AREA FOR THE EXPECTED FILES")
+    roots = search_roots()
+    if not roots:
+        print("  No searchable storage roots exist here - run this on the cluster.")
+        return
+
+    all_hits = []
+    for root, label in roots:
+        hits = _find_expected(root)
+        marker = f"{len(hits)} found" if hits else "nothing"
+        print(f"  {root:<28} {marker:<12} {label}")
+        all_hits.extend(hits)
+
+    if not all_hits:
+        print("\n  The raw files are not in any of these areas, so the upload "
+              "did not complete.")
+        print("  Upload them to the volume: Catalog > "
+              f"{catalog or '<catalog>'} > {schema or '<schema>'} > Volumes > "
+              "raw > 'Upload to this volume'.")
+        print("  Note the Workspace browser does NOT show volumes - they live "
+              "under Catalog. That is the usual reason an upload seems to have "
+              "vanished.")
+        return
+
+    print()
+    for path in all_hits[:10]:
+        print(f"  FOUND: {path}")
+    if len(all_hits) > 10:
+        print(f"  ... and {len(all_hits) - 10} more")
+
+    directories = sorted({str(Path(p).parent) for p in all_hits})
+    in_volume = [d for d in directories if d.startswith(VOLUMES_ROOT)]
+    if in_volume:
+        print("\n  These are already in a volume. Point "
+              "configs/base.yaml paths.databricks at:")
+        for directory in in_volume:
+            print(f"    {directory}")
+    else:
+        print("\n  These are NOT in a Unity Catalog volume, so the pipeline "
+              "cannot read them at the configured path.")
+        print("  Copy them into the volume, e.g.:")
+        target = (f"/Volumes/{catalog}/{schema}/raw"
+                  if catalog and schema else "/Volumes/<catalog>/<schema>/raw")
+        for directory in directories:
+            print(f"    dbutils.fs.cp('{_to_dbfs_uri(directory)}', "
+                  f"'{target}', recurse=True)")
+
+
+def _to_dbfs_uri(path: str) -> str:
+    """Turn a /dbfs FUSE path back into the dbfs: URI dbutils expects."""
+    return "dbfs:" + path[len("/dbfs"):] if path.startswith("/dbfs/") else path
 
 
 def _safe_listdir(path: str) -> list:

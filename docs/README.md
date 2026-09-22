@@ -97,8 +97,22 @@ upload it once, into the `raw` volume:
     ... through 2017 (21 files)
 ```
 
-Catalog Explorer > the `raw` volume > **Upload to this volume**, or
-`databricks fs cp`.
+**Catalog** (left nav) > `equity_silver_databricks_mlops` > `default` >
+**Volumes** > `raw` > **Upload to this volume**. Or `databricks fs cp`.
+
+> **Volumes are not in the Workspace browser.** Databricks keeps three
+> separate storage areas, and files put in one are invisible from the others:
+>
+> | Area | Where it is | Path |
+> |---|---|---|
+> | **Unity Catalog volumes** | left nav **Catalog** | `/Volumes/<catalog>/<schema>/<volume>/` |
+> | Workspace | left nav **Workspace** | `/Workspace/Users/<you>/` |
+> | DBFS (legacy) | hidden by default | `/FileStore/`, `dbfs:/` |
+>
+> This pipeline reads from a **volume**, so looking in Workspace for the
+> uploaded data will always come up empty. The legacy "Upload data" UI writes
+> to DBFS, not to a volume. `00a_cluster_preflight` searches all three and
+> tells you which one your files are actually in.
 
 ## 4. Run
 
