@@ -1,0 +1,13 @@
+# Pinned to Databricks Runtime 16.4 LTS ML (Python 3.12).
+# ACTION REQUIRED: confirm against `pip freeze` on the actual cluster and
+# adjust if the cluster differs. See DEVIATIONS.md (D-01).
+numpy==1.26.4
+pandas==2.2.3
+pyarrow==15.0.2
+torch==2.6.0
+matplotlib==3.8.4
+openpyxl==3.1.2
+PyYAML==6.0.1
+mlflow==2.21.3
+scipy==1.13.1
+pytest==8.2.0

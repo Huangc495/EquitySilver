@@ -1,0 +1,11 @@
+data/
+mlruns/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Byte-identical duplicate of docs/Ma_2021_JCH.pdf (the path CLAUDE.md uses).
+# Kept on disk as the original download; only the canonical name is tracked.
+docs/The Correlation between Drainage Chemistry and Weather for Full-Scale Waste Rock Piles Based on Artificial Neural Network.pdf

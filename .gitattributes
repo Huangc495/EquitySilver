@@ -1,0 +1,9 @@
+# Normalise line endings: development happens on Windows, the Databricks
+# cluster is Linux, and the same files must run in both (CLAUDE.md rule 5).
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.pdf binary
+*.png binary
+*.xlsx binary
+*.parquet binary

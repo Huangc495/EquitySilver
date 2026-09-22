@@ -1,0 +1,87 @@
+# Configuration for the Ma et al. (2021) LSTM acidity-weather replication.
+# Every hyperparameter and modelling choice lives here. Deviations from the
+# paper are recorded in DEVIATIONS.md.
+
+paths:
+  local:
+    # Weather: one Environment Canada daily CSV per year (glob, relative to repo root).
+    weather_glob: data/raw/en_climate_daily_BC_1072692_*_P1D.csv
+    acidity_excel: data/raw/2017 ARD Chemisty_Clean.xlsx
+    processed_dir: data/processed
+  databricks:
+    # TODO(user): fill in the real catalog/schema before running on the cluster.
+    weather_glob: /Volumes/<catalog>/<schema>/raw/en_climate_daily_BC_1072692_*_P1D.csv
+    acidity_excel: /Volumes/<catalog>/<schema>/raw/2017 ARD Chemisty_Clean.xlsx
+    processed_dir: /Volumes/<catalog>/<schema>/processed
+  reports_dir: reports
+
+mlflow:
+  local_tracking_uri: file:./mlruns
+  local_experiment: equity-silver-lstm
+  # TODO(user): replace <you> with the Databricks workspace username.
+  databricks_experiment: /Users/<you>/equity-silver-lstm
+
+data:
+  weather_start: 1997-01-01
+  weather_end: 2017-12-31
+  acidity_start: 1998-01-01
+  acidity_end: 2017-12-31
+  stations: [BD, C7]
+  # Sheet name in the acidity workbook -> station code.
+  acidity_sheets:
+    Bessmemer Dump: BD
+    C-7: C7
+  same_day_duplicates: mean        # mean | keep
+  # Environment Canada quality flags.
+  trace_precip_as_zero: true       # flag "T" -> 0.0 mm
+  missing_flag_as_nan: true        # flag "M" -> NaN
+
+windows:
+  n_steps: 10
+  types: [A, B]
+  common_sample_set: false         # true = run Type A only on samples surviving Type B
+  time_tag: per_step               # per_step | constant
+  time_tag_origin: 1998-01-01      # day 1
+
+scaling:
+  fit_on: all                      # all (paper) | train
+  ddof: 0                          # population std
+
+model:
+  hidden_sizes: [5, 10, 20]
+  output_activation: linear        # linear | sigmoid (Eq. 7 as printed)
+  init: matlab                     # matlab | torch_default
+  freeze_bias_hh: false
+  fc_baseline_hidden: 10
+  fc_baseline_activation: tanh
+
+train:
+  lr: 0.005
+  momentum: 0.9
+  weight_decay: 1.0e-4             # MATLAB default L2Regularization
+  lr_drop_period: 125
+  lr_drop_factor: 0.2
+  batch_size: 20
+  drop_last: true                  # MATLAB discards the incomplete final mini-batch
+  shuffle: once                    # once (MATLAB default) | every_epoch
+  max_epochs: 200
+  patience: 6
+  restore_best: false              # MATLAB returns the last-iteration network
+  n_repeats: 5
+  base_seed: 42
+
+split:
+  method: random                   # random (paper) | blocked
+  fractions: [0.70, 0.15, 0.15]
+  resplit_each_repeat: false
+
+forecast:
+  station: BD
+  train_years: [1999, 2014]
+  predict_years: [2015, 2016]
+  fractions: [0.80, 0.20]
+  scaler_fit_on: train_period
+
+sensitivity:
+  factors: [0.8, 1.2]
+  variables: [precip, tmean]
