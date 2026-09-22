@@ -68,16 +68,26 @@ than `16.4.x-scala2.12` — which is how `00a_cluster_preflight` detects this.
 The model has about 500 parameters, so no GPU and no Spark parallelism are
 needed. Install `openpyxl` if the runtime lacks it.
 
-Set one cluster environment variable
-(**Compute > Edit > Advanced options > Spark > Environment variables**):
+### Serverless will not work
 
-```
-DATABRICKS_USERNAME=your.name@example.com
-```
+Serverless compute has no runtime selector, no PyTorch and no cluster
+environment variables. `00a_cluster_preflight` recognises it and says so.
+Create a classic all-purpose cluster on an ML runtime and attach the
+notebooks to that instead.
 
-Config values may reference `${VAR}`; they are expanded at load time and raise
-a named error if unset, so no personal identifier is stored in this public
-repo.
+### The workspace username
+
+Config values may reference `${VAR}`, expanded at load time, so no personal
+identifier is stored in this public repo. `DATABRICKS_USERNAME` normally
+resolves **automatically** from the signed-in workspace user, so there is
+usually nothing to set.
+
+Override it only if you need a different value:
+
+- classic cluster: **Compute > Edit > Advanced options > Spark > Environment
+  variables**, `DATABRICKS_USERNAME=your.name@example.com`
+- any notebook: `os.environ["DATABRICKS_USERNAME"] = "your.name@example.com"`
+  before `load_config()`
 
 ## 2. Unity Catalog volumes
 

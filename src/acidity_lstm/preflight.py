@@ -69,6 +69,34 @@ def is_ml_runtime() -> bool:
     return "-ml" in runtime_version().lower()
 
 
+def is_serverless() -> bool:
+    """Heuristic: does this look like serverless compute?
+
+    Serverless reports a client version such as "client.1.13" rather than a
+    classic "16.4.x-cpu-ml-scala2.12", and exposes no runtime selector, no
+    cluster environment variables and no PyTorch. The string is not
+    documented as stable, so this only sharpens the message; the ML check
+    above is what actually decides.
+    """
+    version = runtime_version().lower()
+    return bool(version) and ("client." in version or "serverless" in version)
+
+
+def _runtime_advice() -> str:
+    if is_serverless():
+        return (
+            f"'{runtime_version()}' looks like serverless compute, which has "
+            "no runtime selector and no PyTorch. Create a classic cluster: "
+            "Compute > Create compute > Databricks Runtime version > an entry "
+            "labelled 'ML', then attach this notebook to it."
+        )
+    return (
+        f"'{runtime_version()}' is a standard runtime, not ML - PyTorch and "
+        "MLflow are missing because of this. Compute > Edit > Databricks "
+        "Runtime version > pick an entry labelled 'ML', e.g. 16.4 LTS ML."
+    )
+
+
 def check_environment(cfg: Config) -> list:
     """Where are we running, and is the MLflow target resolvable?"""
     out = [
@@ -84,11 +112,7 @@ def check_environment(cfg: Config) -> list:
         ))
         out.append(_check(
             "environment", "Runtime ML", is_ml_runtime(),
-            runtime_version() if is_ml_runtime() else
-            f"'{runtime_version()}' is a standard runtime, not ML - "
-            "PyTorch and MLflow are missing because of this. "
-            "Compute > Edit > Databricks Runtime version > pick an entry "
-            "labelled 'ML', e.g. 16.4 LTS ML.",
+            runtime_version() if is_ml_runtime() else _runtime_advice(),
         ))
     try:
         out.append(Check("environment", "mlflow experiment", OK,
@@ -170,8 +194,11 @@ def check_packages(cfg: Config) -> list:
             # torch and mlflow ship only with Runtime ML, so name the real
             # cause rather than leaving two failures looking unrelated.
             if name in ("torch", "mlflow") and on_databricks() and not is_ml_runtime():
-                detail = ("not installed - this cluster is not a Runtime ML "
-                          "build; see the 'Runtime ML' row above")
+                detail = ("not installed - "
+                          + ("serverless compute does not provide it"
+                             if is_serverless()
+                             else "this cluster is not a Runtime ML build")
+                          + "; see the 'Runtime ML' row above")
             out.append(Check("packages", name, FAIL, detail))
             continue
 

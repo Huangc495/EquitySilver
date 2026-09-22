@@ -356,3 +356,74 @@ def test_missing_package_off_cluster_stays_plain(cfg, monkeypatch):
 def test_runtime_check_absent_when_local(cfg, monkeypatch):
     monkeypatch.delenv(DATABRICKS_ENV, raising=False)
     assert not any(c.name == "Runtime ML" for c in check_environment(cfg))
+
+
+# --- Serverless -----------------------------------------------------------
+
+def test_serverless_is_recognised(monkeypatch):
+    from acidity_lstm.preflight import is_serverless
+
+    for version in ("client.1.13", "client.2.0", "serverless-1"):
+        monkeypatch.setenv(DATABRICKS_ENV, version)
+        assert is_serverless(), version
+
+    for version in ("16.4.x-cpu-ml-scala2.12", "16.4.x-scala2.12", ""):
+        monkeypatch.setenv(DATABRICKS_ENV, version)
+        assert not is_serverless(), version
+
+
+def test_serverless_gets_its_own_advice(cfg, monkeypatch):
+    """Telling a serverless user to 'Edit the runtime version' is useless."""
+    monkeypatch.setenv(DATABRICKS_ENV, "client.1.13")
+    monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
+
+    detail = next(c.detail for c in check_environment(cfg) if c.name == "Runtime ML")
+    assert "serverless" in detail.lower()
+    assert "Create compute" in detail
+    assert "Edit >" not in detail, "serverless has no runtime to edit"
+
+
+def test_standard_runtime_advice_differs_from_serverless(cfg, monkeypatch):
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4.x-scala2.12")
+    monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
+
+    detail = next(c.detail for c in check_environment(cfg) if c.name == "Runtime ML")
+    assert "standard runtime" in detail
+    assert "serverless" not in detail.lower()
+
+
+# --- Username fallback ----------------------------------------------------
+
+def test_username_falls_back_to_the_platform(monkeypatch):
+    """Serverless has no cluster env vars, so ask Databricks instead."""
+    from acidity_lstm import config as config_mod
+
+    monkeypatch.delenv("DATABRICKS_USERNAME", raising=False)
+    monkeypatch.setitem(config_mod._ENV_FALLBACKS, "DATABRICKS_USERNAME",
+                        lambda: "resolved@example.com")
+    assert config_mod.expand_env("/Users/${DATABRICKS_USERNAME}/x") == \
+        "/Users/resolved@example.com/x"
+
+
+def test_environment_variable_wins_over_the_fallback(monkeypatch):
+    from acidity_lstm import config as config_mod
+
+    monkeypatch.setenv("DATABRICKS_USERNAME", "explicit@example.com")
+    monkeypatch.setitem(config_mod._ENV_FALLBACKS, "DATABRICKS_USERNAME",
+                        lambda: "resolved@example.com")
+    assert "explicit@example.com" in config_mod.expand_env("${DATABRICKS_USERNAME}")
+
+
+def test_fallback_returning_nothing_still_raises(monkeypatch):
+    from acidity_lstm import config as config_mod
+
+    monkeypatch.delenv("DATABRICKS_USERNAME", raising=False)
+    monkeypatch.setitem(config_mod._ENV_FALLBACKS, "DATABRICKS_USERNAME", lambda: "")
+    with pytest.raises(KeyError, match="DATABRICKS_USERNAME"):
+        config_mod.expand_env("${DATABRICKS_USERNAME}")
+
+
+def test_current_user_is_empty_off_cluster():
+    from acidity_lstm.config import databricks_current_user
+
+    assert databricks_current_user() == ""

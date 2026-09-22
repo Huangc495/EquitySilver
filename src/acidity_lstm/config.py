@@ -16,6 +16,42 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
+def databricks_current_user() -> str:
+    """The signed-in workspace user, asked of Databricks directly.
+
+    Serverless compute has no cluster environment variables, so
+    `DATABRICKS_USERNAME` cannot be set there the way a classic cluster
+    allows. Asking the platform removes that setup step everywhere. Returns
+    "" off-cluster or when no source answers.
+    """
+    try:
+        from pyspark.sql import SparkSession
+
+        spark = SparkSession.getActiveSession()
+        if spark is not None:
+            user = spark.sql("SELECT current_user()").collect()[0][0]
+            if user:
+                return str(user)
+    except Exception:                                # noqa: BLE001
+        pass
+
+    try:
+        from databricks.sdk.runtime import dbutils
+
+        ctx = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
+        user = ctx.tags().apply("user")
+        if user:
+            return str(user)
+    except Exception:                                # noqa: BLE001
+        pass
+    return ""
+
+
+# Variables that can be resolved from the platform when unset in the
+# environment, so a missing cluster setting is not a hard stop.
+_ENV_FALLBACKS = {"DATABRICKS_USERNAME": databricks_current_user}
+
+
 def expand_env(value: str, where: str = "config") -> str:
     """Expand ${VAR} references, failing loudly when a variable is unset.
 
@@ -24,17 +60,23 @@ def expand_env(value: str, where: str = "config") -> str:
     config, which is public. `os.path.expandvars` is not used because it
     leaves unset variables in place silently, which would produce a path
     containing a literal "${...}" and a confusing downstream error.
+
+    A few variables have a platform fallback (see `_ENV_FALLBACKS`); the
+    environment still wins when it is set.
     """
     def substitute(match: re.Match) -> str:
         name = match.group(1)
         resolved = os.environ.get(name)
+        if not resolved and name in _ENV_FALLBACKS:
+            resolved = _ENV_FALLBACKS[name]()
         if not resolved:
             raise KeyError(
                 f"{where} references ${{{name}}}, but that environment "
-                f"variable is not set. On Databricks set it on the cluster "
-                f"(Compute > Edit > Advanced options > Spark > Environment "
-                f"variables), e.g. {name}=you@example.com. Locally, export it "
-                f"before running."
+                f"variable is not set and could not be resolved from the "
+                f"platform. On a classic cluster set it under Compute > Edit "
+                f"> Advanced options > Spark > Environment variables, e.g. "
+                f"{name}=you@example.com. In a notebook you can also set it "
+                f"directly: os.environ['{name}'] = 'you@example.com'."
             )
         return resolved
 
