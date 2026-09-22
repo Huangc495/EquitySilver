@@ -11,7 +11,7 @@ this dataset; **open** = needs a decision from the user.
 
 ## Environment and repo
 
-### D-00 Databricks workspace settings — *partially resolved*
+### D-00 Databricks workspace settings — *resolved*
 Workspace: **Equity-Silver-Databricks-MLOps** (Azure Databricks).
 
 MLflow experiment: `/Users/${DATABRICKS_USERNAME}/equity-silver-lstm`. The
@@ -47,7 +47,12 @@ the development machine (no Databricks CLI or credentials there), so
 `notebooks/00a_cluster_preflight.py` checks it on the cluster instead — see
 D-31.
 
-### D-01 Dependency pins are not yet confirmed against the cluster — *open*
+**Confirmed 2026-09-22 (M0).** The preflight passed on the workspace: all 21
+weather CSVs and the acidity workbook are in the `raw` volume, both volumes
+are writable, and the MLflow experiment resolves with no environment
+variable set.
+
+### D-01 Dependency pins are confirmed against the platform — *resolved*
 `CLAUDE.md` says to pin `requirements.txt` from `pip freeze` on the Databricks
 cluster. No cluster access was available, so the pins target **Databricks
 Runtime 16.4 LTS ML** (Python 3.12, numpy 1.26.4, pandas 2.2.3, torch 2.6.0,
@@ -56,6 +61,16 @@ mlflow 2.21.3).
 **Effect:** none on results if the cluster matches; a pandas/numpy major
 mismatch could change behaviour. **Action:** confirm with `pip freeze` on the
 cluster and re-pin.
+
+**Resolved 2026-09-22 (M0).** There is no Runtime ML cluster: the workspace
+is serverless-only (D-33). The preflight's version report from serverless
+environment 4 is now what `requirements.txt` pins. The one major change was
+numpy 1.26.4 → 2.1.3. Rerunning every notebook locally on the new pins
+reproduced all 66 result rows (Table 1, FC baseline, time tag,
+sensitivity) **bit for bit**; only wall-clock seconds and matplotlib's
+rendering of the figures differ. One cosmetic difference surfaced: numpy 2
+ordered equal-length weather gaps differently in the audit's "longest runs"
+table, so ties there are now broken by start date.
 
 ### D-02 Raw data layout differs from the config sketch — *active*
 `CLAUDE.md` describes "a single Excel file" holding both weather and acidity.

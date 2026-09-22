@@ -131,7 +131,7 @@ The phases from `HANDOVER.md` section 9, adjusted for the decisions above.
 
 | Phase | Goal | Done when | Status |
 |---|---|---|---|
-| **M0** | Databricks baseline | Preflight fully green on serverless; notebooks 00–06 run on Databricks and reproduce the local numbers; D-01 closed from the platform's actual versions | **in progress** |
+| **M0** | Databricks baseline | Preflight fully green on serverless; notebooks 00–06 run on Databricks and reproduce the local numbers; D-01 closed from the platform's actual versions | **done, awaiting approval** |
 | M1 | Packaging and CI | `pyproject.toml`; unit and integration tests separated by pytest markers; an **Azure Pipeline** running lint and unit tests on every pull request | not started |
 | M2 | A registrable model | A pyfunc bundling weights, scaler and config, with a signature, registered in Unity Catalog; champion and shadow challenger per D3 | not started |
 | M3 | Training pipeline and CD | An Asset Bundle deploying a training job to dev, staging and prod **from Azure Pipelines**, with the promotion gate below | not started |
@@ -158,6 +158,62 @@ all samples (D-22); and across **several seeds**, not the best one (D-28).
 | Create a classic ML cluster | Claude | **impossible**: no classic compute plane (D-33, D7) |
 | Probe serverless with the preflight | Claude | done: everything passed except the old Runtime ML rule |
 | Close D-01: re-pin `requirements.txt` from the platform | Claude | done: serverless environment 4 |
-| Run notebooks 00–06 on serverless | Claude | pending |
-| Compare the numbers: numpy 2 locally against the committed numpy 1 reports, and Databricks against local | Claude | pending |
-| Confirm MLflow runs appear in `/Users/<you>/equity-silver-lstm` | Claude | pending |
+| Run notebooks 00–06 on serverless | Claude | **done**: all 8 tasks succeeded |
+| Compare numpy 2 locally with the committed numpy 1 reports | Claude | **done**: bit-identical |
+| Compare Databricks with local | Claude | **done**: identical to floating-point noise |
+| Confirm MLflow runs appear in `/Users/<you>/equity-silver-lstm` | Claude | **done**: 378 runs |
+
+## M0 results (2026-09-22)
+
+The first end-to-end run on Databricks was a one-time serverless job,
+`equity-silver-m0`. It ran eight notebook tasks in sequence, sharing one
+environment built from `requirements-databricks.txt`, from the Git folder
+at commit `f56eadb`. **All eight succeeded**, in about 11 minutes of compute:
+
+| Task | Seconds |
+|---|---|
+| 00a preflight (including installing the environment) | 69 |
+| 00 data audit | 29 |
+| 01 parametric study | 277 |
+| 02 FC baseline | 51 |
+| 03 time tag | 76 |
+| 04 forecast | 41 |
+| 05 sensitivity | 30 |
+| 06 replication report | 91 |
+
+**The numbers reproduce, and they were checked two ways.**
+
+| Comparison | Result |
+|---|---|
+| Local on numpy 2.1.3 against the committed numpy 1.26.4 reports | all 66 result rows **bit-identical**; only wall-clock seconds and figure rendering differ |
+| Databricks (Linux, serverless) against local (Windows) | chosen seeds, epochs and sample counts identical; largest MSE difference 1.3e-7, largest RMSE difference 0.00016 mg/L, sensitivity means within 0.001 mg/L |
+| Rounded reports: Table 1, FC baseline, time tag, forecast and sensitivity, sample counts | **identical, line for line** |
+
+One difference was real. The data audit's "longest gap runs" table
+ordered tied lengths three different ways: numpy 1 on Windows, numpy 2 on
+Windows, and numpy 2 on Linux. Ties are now broken by start date, so every
+platform writes the same file.
+
+**MLflow:** the workspace experiment holds 378 runs, all `FINISHED`, all
+tagged with serverless `client.4.10`. The 310 training runs each log their
+seed and split sizes. The summary runs carry the figures and reports.
+
+**Reports** from the cluster are in
+`/Volumes/equity_silver_databricks_mlops/default/processed/reports` (D-32).
+They are not committed, and must not be: the cluster's copy of the
+replication report names the MLflow experiment by its full path, which
+includes the workspace user's email.
+
+### Tooling notes for later phases
+
+- **The CLI hides some errors behind retries.** `clusters create` simply
+  hung. `--debug` with a timeout showed the real error.
+- **Git Bash rewrites leading-slash arguments.** `/Users/...` became
+  `C:/Program Files/Git/Users/...`. Set `MSYS_NO_PATHCONV=1`, or use
+  PowerShell, for any workspace path.
+- **`experiments search-runs` fails** on a bug in the Databricks Go SDK. The
+  raw `databricks api post /api/2.0/mlflow/runs/search` works.
+- **The `equity-silver` profile's host includes a browser path**
+  (`…/browse/folders/…`). The Go CLI tolerates it. The Python SDK, and
+  therefore MLflow run from this machine, does not. It needs fixing before
+  M2 and M3.

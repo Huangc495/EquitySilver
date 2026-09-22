@@ -25,8 +25,8 @@ HEADING = re.compile(r"^### ((?:D|Q)-\d+) (.+?) — \*(.+?)\*\s*$", re.M)
 
 # Likely effect of each deviation on the replication. Keyed to DEVIATIONS.md.
 LIKELY_EFFECT = {
-    "D-00": "None on results. Deployment configuration; the catalog and schema are still outstanding.",
-    "D-01": "None on results. Environment reproducibility only; confirm the pins against the cluster.",
+    "D-00": "None on results. Deployment configuration, confirmed by a preflight run on the workspace.",
+    "D-01": "None on results. Pins now match serverless environment 4; the move to numpy 2 changed no metric.",
     "D-02": "None. Same data source as the paper (Equity Silver, Climate ID 1072692).",
     "D-03": "None. Code organisation only.",
     "D-04": "None. Report formatting only.",
@@ -581,9 +581,8 @@ def _section_reproducibility(out, cfg):
            "`02_fc_baseline`, `03_refined_timetag`, `04_forecast`, "
            "`05_sensitivity`, `06_replication_report`.")
     w(out)
-    w(out, "**Outstanding before a Databricks run:** the dependency pins are "
-           "not yet confirmed against the cluster (D-01), and "
-           "`configs/base.yaml` still carries `<catalog>`, `<schema>` and "
-           "`<you>` placeholders for the Volumes paths and the MLflow "
-           "experiment.")
+    w(out, "**On Databricks** the pipeline runs on serverless environment 4, "
+           "with PyTorch and MLflow from `requirements-databricks.txt` (D-33); "
+           "`docs/README.md` has the setup. The local pins match that "
+           "environment (D-01).")
     w(out)

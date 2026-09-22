@@ -176,7 +176,10 @@ def _section_weather_continuity(out, raw_w, weather):
     w(out, f"### Gap runs (either variable missing): {len(runs)} runs, "
            f"{int(runs['n_days'].sum()):,} days")
     w(out)
-    top = runs.sort_values("n_days", ascending=False).head(15).copy()
+    # Date breaks ties, so the table is identical on every platform: numpy 2
+    # orders equal-length runs differently from numpy 1 (D-33).
+    top = runs.sort_values(["n_days", "start"], ascending=[False, True],
+                           kind="stable").head(15).copy()
     top["start"] = pd.to_datetime(top["start"]).dt.strftime("%Y-%m-%d")
     top["end"] = pd.to_datetime(top["end"]).dt.strftime("%Y-%m-%d")
     w(out, "Longest 15 runs:")
@@ -208,7 +211,8 @@ def _section_weather_continuity(out, raw_w, weather):
     w(out)
     w(out, _md_table(per_year))
     w(out)
-    worst = per_year.sort_values("either_missing", ascending=False).head(5)
+    worst = per_year.sort_values(["either_missing", "year"],
+                                 ascending=[False, True], kind="stable").head(5)
     w(out, "Worst years: "
            + ", ".join(f"**{int(r.year)}** ({int(r.either_missing)} d)"
                        for r in worst.itertuples()))
@@ -224,7 +228,7 @@ def _section_flags(out, raw_w, wrep):
     w(out, "## 3. Weather quality flags")
     w(out)
     for var, counts in wrep.weather_flag_counts.items():
-        s = pd.Series(counts).sort_values(ascending=False)
+        s = pd.Series(counts).sort_values(ascending=False, kind="stable")
         w(out, f"- **{var}**: " + ", ".join(f"`{k}` x{v:,}" for k, v in s.items()))
     w(out)
     w(out, "Environment Canada flag meanings: `M` missing, `T` trace, "
