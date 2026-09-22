@@ -129,7 +129,12 @@ class Config:
 
     @property
     def reports_dir(self) -> Path:
-        return _resolve_against(self.raw["paths"]["reports_dir"], self.repo_root)
+        """Where generated reports go: the repo locally, a volume on a cluster.
+
+        On Databricks the repo is a Git folder, so writing reports into it
+        would leave tracked files modified and make the next pull conflict.
+        """
+        return self.resolve("reports_dir")
 
     @property
     def mlflow_experiment(self) -> str:

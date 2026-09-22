@@ -18,6 +18,7 @@ from acidity_lstm.config import (
 )
 
 DATABRICKS_ENV = "DATABRICKS_RUNTIME_VERSION"
+CLUSTER_PATH_KEYS = ("weather_glob", "acidity_excel", "processed_dir", "reports_dir")
 
 
 @pytest.fixture
@@ -154,7 +155,7 @@ def test_relative_paths_resolve_against_the_repo_root():
 def test_cluster_paths_resolve_unchanged(monkeypatch):
     monkeypatch.setenv(DATABRICKS_ENV, "16.4")
     cfg = load_config()
-    for key in ("weather_glob", "acidity_excel", "processed_dir"):
+    for key in CLUSTER_PATH_KEYS:
         resolved = cfg.resolve(key).as_posix()
         assert resolved == str(cfg.paths[key]), key
         assert resolved.startswith("/Volumes/"), key
@@ -164,7 +165,7 @@ def test_cluster_paths_have_no_unfilled_placeholders(monkeypatch):
     """A left-over <catalog> would only fail once the cluster ran."""
     monkeypatch.setenv(DATABRICKS_ENV, "16.4")
     cfg = load_config()
-    for key in ("weather_glob", "acidity_excel", "processed_dir"):
+    for key in CLUSTER_PATH_KEYS:
         value = str(cfg.paths[key])
         assert "<" not in value and ">" not in value, f"{key}: {value}"
 
@@ -177,7 +178,7 @@ def test_cluster_paths_are_well_formed_volume_paths(monkeypatch):
     """
     monkeypatch.setenv(DATABRICKS_ENV, "16.4")
     cfg = load_config()
-    for key in ("weather_glob", "acidity_excel", "processed_dir"):
+    for key in CLUSTER_PATH_KEYS:
         parts = str(cfg.paths[key]).strip("/").split("/")
         assert parts[0] == "Volumes", key
         assert len(parts) >= 4, f"{key} needs catalog/schema/volume: {parts}"
@@ -196,9 +197,23 @@ def test_all_cluster_paths_share_one_catalog_and_schema(monkeypatch):
     cfg = load_config()
     prefixes = {
         "/".join(str(cfg.paths[key]).strip("/").split("/")[:3])
-        for key in ("weather_glob", "acidity_excel", "processed_dir")
+        for key in CLUSTER_PATH_KEYS
     }
     assert len(prefixes) == 1, f"paths disagree on catalog/schema: {prefixes}"
+
+
+def test_cluster_reports_are_written_outside_the_repo(monkeypatch):
+    """On a cluster the repo is a Git folder; reports there would dirty it (D-32)."""
+    monkeypatch.setenv(DATABRICKS_ENV, "16.4")
+    cfg = load_config()
+    assert cfg.reports_dir.as_posix().startswith("/Volumes/")
+    assert not cfg.reports_dir.is_relative_to(cfg.repo_root)
+
+
+def test_local_reports_stay_in_the_repo(monkeypatch):
+    monkeypatch.delenv(DATABRICKS_ENV, raising=False)
+    cfg = load_config()
+    assert cfg.reports_dir == cfg.repo_root / "reports"
 
 
 def test_local_paths_are_absolute_and_point_at_real_data(monkeypatch):

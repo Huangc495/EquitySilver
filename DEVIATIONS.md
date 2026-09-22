@@ -531,3 +531,36 @@ requirements block, which is how **D-01** gets closed from the cluster itself.
 
 **Effect:** none on results. 17 tests, mostly driving the failure paths — a
 preflight that cannot fail is worthless.
+
+---
+
+## MLOps stage
+
+Entries from here on belong to the MLOps stage (`MLOPS.md`). Its decisions
+are numbered D1–D6 there; the entries below are departures from the
+replication's own plan made along the way.
+
+### D-32 Cluster reports go to a volume, not the repo — *active*
+`CLAUDE.md` puts generated reports in `reports/` at the repo root, and until
+now that held on every platform. On Databricks the repo is a **Git folder**.
+A run that writes `reports/` there leaves tracked files modified in the
+workspace, and the next pull of `main` can then fail with a conflict.
+
+`reports_dir` now lives in each path set, like the data paths:
+
+| Where | `reports_dir` |
+|---|---|
+| local | `reports` (unchanged) |
+| Databricks | `/Volumes/equity_silver_databricks_mlops/default/processed/reports` |
+
+`Config.reports_dir` resolves it the same way as every other path.
+`test_config.py` checks that the cluster path is a well-formed volume path
+and lies outside the repo, and that the local path is still `reports/`.
+
+This is the minimum change that lets phase M0 run from the Git folder. In
+production, outputs move to Unity Catalog tables (M4), and this volume
+directory is an interim location.
+
+**Effect:** none on results. Reports from a cluster run land in the volume,
+so comparing them with the committed local reports means reading them from
+there.

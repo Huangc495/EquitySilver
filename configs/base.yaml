@@ -8,6 +8,7 @@ paths:
     weather_glob: data/raw/en_climate_daily_BC_1072692_*_P1D.csv
     acidity_excel: data/raw/2017 ARD Chemisty_Clean.xlsx
     processed_dir: data/processed
+    reports_dir: reports
   databricks:
     # Unity Catalog volumes: /Volumes/<catalog>/<schema>/<volume>/<path>.
     # Catalog equity_silver_databricks_mlops, schema default (auto-created),
@@ -16,7 +17,9 @@ paths:
     weather_glob: /Volumes/equity_silver_databricks_mlops/default/raw/en_climate_daily_BC_1072692_*_P1D.csv
     acidity_excel: /Volumes/equity_silver_databricks_mlops/default/raw/2017 ARD Chemisty_Clean.xlsx
     processed_dir: /Volumes/equity_silver_databricks_mlops/default/processed
-  reports_dir: reports
+    # Not the repo: on the cluster that is a Git folder, and writing tracked
+    # files there would make later pulls conflict (DEVIATIONS.md D-32).
+    reports_dir: /Volumes/equity_silver_databricks_mlops/default/processed/reports
 
 mlflow:
   local_tracking_uri: file:./mlruns
