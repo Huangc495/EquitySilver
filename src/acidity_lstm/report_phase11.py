@@ -58,6 +58,7 @@ LIKELY_EFFECT = {
     "D-30": "None on any reported result; every number came from the local path set. Fixed, with a regression test.",
     "D-31": "None on results. Catches cluster-only setup faults before they surface mid-pipeline, and closes D-01 from the cluster.",
     "D-32": "None on results. Cluster reports land in a volume rather than the Git folder, so pulls cannot conflict.",
+    "D-33": "None on the method. Serverless replaces Runtime ML; local pins move to numpy 2.1.3 to match, checked against the committed numbers.",
     "Q-01": "Moderate. ~185 Type B samples make every metric noisy; run-to-run SD exceeds our mean gap to the paper.",
     "Q-02": "None, once tested. Type B still beats Type A on identical samples.",
     "Q-03": "Resolved in D-13.",

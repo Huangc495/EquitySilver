@@ -1,0 +1,16 @@
+# What the Databricks serverless environment adds (DEVIATIONS.md D-33).
+#
+# The workspace has no classic compute, so there is no Runtime ML to supply
+# PyTorch and MLflow. Serverless environment 4 (configs/base.yaml,
+# compute.serverless_environment_version) already provides numpy, pandas,
+# pyarrow, matplotlib, scipy and PyYAML at the versions pinned in
+# requirements.txt; these are the packages it lacks.
+#
+# Use it as a job task's environment dependency:
+#   -r /Workspace/Users/<you>/EquitySilver/requirements-databricks.txt
+# or, for a notebook, list the same lines in the Environment side panel.
+
+# CPU-only build. The PyPI wheel pulls about 2.5 GB of CUDA libraries.
+torch @ https://download.pytorch.org/whl/cpu/torch-2.6.0%2Bcpu-cp312-cp312-linux_x86_64.whl
+mlflow==2.21.3
+openpyxl==3.1.2

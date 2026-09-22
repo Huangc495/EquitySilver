@@ -21,6 +21,13 @@ paths:
     # files there would make later pulls conflict (DEVIATIONS.md D-32).
     reports_dir: /Volumes/equity_silver_databricks_mlops/default/processed/reports
 
+compute:
+  # The workspace has no classic compute plane, so everything runs on
+  # serverless (DEVIATIONS.md D-33). Environment 4 is Python 3.12.3; the
+  # packages it lacks come from the requirements file below.
+  serverless_environment_version: "4"
+  requirements: requirements-databricks.txt
+
 mlflow:
   local_tracking_uri: file:./mlruns
   local_experiment: equity-silver-lstm

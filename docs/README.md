@@ -65,27 +65,43 @@ Paths and the MLflow experiment are selected automatically from the
 `DATABRICKS_RUNTIME_VERSION` environment variable, so the same code runs
 locally and on the cluster with no edits.
 
-## 1. Cluster
+## 1. Compute: serverless
 
-**The runtime must be a Databricks Runtime ML build.** PyTorch and MLflow ship
-only with ML runtimes; a standard runtime of the same version does not have
-them, and the preflight will fail with `torch not installed` and
-`mlflow not installed`.
+**This workspace has no classic compute plane.** Creating any classic
+cluster, all-purpose or job, fails with "does not have any associated worker
+environments" (DEVIATIONS.md D-33). Everything runs on **serverless**.
 
-Create the cluster as: single node, CPU only, and under **Databricks Runtime
-version** pick an entry labelled **ML**, e.g. `16.4 LTS ML`. ML builds tag
-themselves in `DATABRICKS_RUNTIME_VERSION` — `16.4.x-cpu-ml-scala2.12` rather
-than `16.4.x-scala2.12` — which is how `00a_cluster_preflight` detects this.
+Serverless has no Runtime ML, so PyTorch and MLflow come from an
+environment instead. `requirements-databricks.txt` lists what serverless
+environment 4 lacks: a CPU-only PyTorch 2.6.0 wheel, MLflow 2.21.3 and
+openpyxl. Everything else is already in the environment, at the versions
+`requirements.txt` pins.
+
+**In a job** (how phase M0 runs), give each notebook task an environment:
+
+```json
+"environments": [{
+  "environment_key": "m0",
+  "spec": {
+    "environment_version": "4",
+    "dependencies": ["-r /Workspace/Users/<you>/EquitySilver/requirements-databricks.txt"]
+  }
+}]
+```
+
+**Interactively:** open a notebook, pick **Serverless** in the compute
+dropdown, open the **Environment** side panel (right edge), set the
+environment version to **4**, add the three lines of
+`requirements-databricks.txt` as dependencies, and **Apply**.
 
 The model has about 500 parameters, so no GPU and no Spark parallelism are
-needed. Install `openpyxl` if the runtime lacks it.
+needed. `00a_cluster_preflight` reports serverless as `client.4.x` and warns
+if the environment version differs from `compute.serverless_environment_version`
+in `configs/base.yaml`.
 
-### Serverless will not work
-
-Serverless compute has no runtime selector, no PyTorch and no cluster
-environment variables. `00a_cluster_preflight` recognises it and says so.
-Create a classic all-purpose cluster on an ML runtime and attach the
-notebooks to that instead.
+On a workspace that *does* have classic compute, a single-node CPU cluster
+on a Runtime **ML** build (e.g. 16.4 LTS ML) also works, and the preflight
+accepts it.
 
 ### The workspace username
 
@@ -96,8 +112,6 @@ usually nothing to set.
 
 Override it only if you need a different value:
 
-- classic cluster: **Compute > Edit > Advanced options > Spark > Environment
-  variables**, `DATABRICKS_USERNAME=your.name@example.com`
 - any notebook: `os.environ["DATABRICKS_USERNAME"] = "your.name@example.com"`
   before `load_config()`
 
@@ -163,20 +177,22 @@ Use **Pull** in that folder to pick up later changes.
 
 ## 5. Run
 
-Open a notebook, attach it to the cluster with the dropdown at the top right,
-then **Run all**. Each notebook adds `src/` to `sys.path` itself.
+Open a notebook, attach it to **Serverless** with the environment from
+section 1, then **Run all**. Each notebook adds `src/` to `sys.path` itself.
 
 | Notebook | Phase | Writes |
 |---|---|---|
 | `00a_cluster_preflight` | - | nothing; checks the environment and data |
-| `00_data_audit` | 0-2 | `reports/00_data_audit.md`, `02_sample_counts.md`, parquet |
-| `01_parametric_study` | 6 | `reports/table1.md`, Figs 6-7 |
-| `02_fc_baseline` | 7 | `reports/fc_baseline.md` |
-| `03_refined_timetag` | 8 | `reports/refined_timetag.md`, Figs 9-10 |
-| `04_forecast` | 9-10 | `reports/forecast_sensitivity.md`, Figs 11-12 |
+| `00_data_audit` | 0-2 | `00_data_audit.md`, `02_sample_counts.md`, parquet |
+| `01_parametric_study` | 6 | `table1.md`, Figs 6-7 |
+| `02_fc_baseline` | 7 | `fc_baseline.md` |
+| `03_refined_timetag` | 8 | `refined_timetag.md`, Figs 9-10 |
+| `04_forecast` | 9-10 | `forecast_sensitivity.md`, Figs 11-12 |
 | `05_sensitivity` | 10 | Fig. 12 alone |
-| `06_replication_report` | 11 | `reports/replication_report.md` |
+| `06_replication_report` | 11 | `replication_report.md` |
 
+Reports go to `/Volumes/equity_silver_databricks_mlops/default/processed/reports`,
+not the Git folder, so a run never leaves tracked files modified (D-32).
 Runs log to `/Users/${DATABRICKS_USERNAME}/equity-silver-lstm` in MLflow.
 
 Run **`00a_cluster_preflight` first**. It changes nothing and verifies the

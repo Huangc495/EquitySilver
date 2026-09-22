@@ -288,7 +288,7 @@ def test_search_explains_when_nothing_is_found(capsys):
         assert "run this on the cluster" in out
 
 
-# --- Runtime ML detection -------------------------------------------------
+# --- Compute detection ---------------------------------------------------
 
 def test_ml_runtime_detected_from_the_version_string(monkeypatch):
     from acidity_lstm.preflight import is_ml_runtime
@@ -309,16 +309,16 @@ def test_standard_runtime_fails_with_the_fix(cfg, monkeypatch):
     monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
 
     checks = check_environment(cfg)
-    assert status_of(checks, "Runtime ML") == FAIL
-    detail = next(c.detail for c in checks if c.name == "Runtime ML")
+    assert status_of(checks, "compute") == FAIL
+    detail = next(c.detail for c in checks if c.name == "compute")
     assert "not ML" in detail
-    assert "Databricks Runtime version" in detail
+    assert "requirements-databricks.txt" in detail, "serverless is the way out here"
 
 
 def test_ml_runtime_passes(cfg, monkeypatch):
     monkeypatch.setenv(DATABRICKS_ENV, "16.4.x-cpu-ml-scala2.12")
     monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
-    assert status_of(check_environment(cfg), "Runtime ML") == OK
+    assert status_of(check_environment(cfg), "compute") == OK
 
 
 def test_missing_torch_points_at_the_runtime(cfg, monkeypatch):
@@ -355,7 +355,7 @@ def test_missing_package_off_cluster_stays_plain(cfg, monkeypatch):
 
 def test_runtime_check_absent_when_local(cfg, monkeypatch):
     monkeypatch.delenv(DATABRICKS_ENV, raising=False)
-    assert not any(c.name == "Runtime ML" for c in check_environment(cfg))
+    assert not any(c.name == "compute" for c in check_environment(cfg))
 
 
 # --- Serverless -----------------------------------------------------------
@@ -372,24 +372,72 @@ def test_serverless_is_recognised(monkeypatch):
         assert not is_serverless(), version
 
 
-def test_serverless_gets_its_own_advice(cfg, monkeypatch):
-    """Telling a serverless user to 'Edit the runtime version' is useless."""
-    monkeypatch.setenv(DATABRICKS_ENV, "client.1.13")
+def test_serverless_environment_version_parsed(monkeypatch):
+    from acidity_lstm.preflight import serverless_environment_version
+
+    for version, expected in (("client.4.10", "4"), ("client.1.13", "1"),
+                              ("16.4.x-cpu-ml-scala2.12", ""), ("", "")):
+        monkeypatch.setenv(DATABRICKS_ENV, version)
+        assert serverless_environment_version() == expected, version
+
+
+def test_serverless_passes_the_compute_check(cfg, monkeypatch):
+    """This workspace is serverless-only (D-33): serverless is the normal case."""
+    monkeypatch.setenv(DATABRICKS_ENV, "client.4.10")
     monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
 
-    detail = next(c.detail for c in check_environment(cfg) if c.name == "Runtime ML")
-    assert "serverless" in detail.lower()
-    assert "Create compute" in detail
-    assert "Edit >" not in detail, "serverless has no runtime to edit"
+    checks = check_environment(cfg)
+    assert status_of(checks, "compute") == OK
+    assert "serverless" in next(c.detail for c in checks if c.name == "compute")
+
+
+def test_serverless_environment_mismatch_warns(cfg, monkeypatch):
+    """A different environment version is worth knowing, not a stop."""
+    monkeypatch.setenv(DATABRICKS_ENV, "client.2.5")
+    monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
+
+    checks = check_environment(cfg)
+    assert status_of(checks, "compute") == WARN
+    detail = next(c.detail for c in checks if c.name == "compute")
+    assert "serverless_environment_version" in detail
+
+
+def test_serverless_missing_torch_points_at_the_environment(cfg, monkeypatch):
+    """Telling a serverless user to create a cluster is useless: they cannot."""
+    from acidity_lstm import preflight
+
+    monkeypatch.setenv(DATABRICKS_ENV, "client.4.10")
+
+    def absent(name):
+        if name in ("torch", "mlflow"):
+            raise preflight.md.PackageNotFoundError(name)
+        return "1.0.0"
+
+    monkeypatch.setattr(preflight.md, "version", absent)
+    checks = check_packages(cfg)
+    for name in ("torch", "mlflow"):
+        assert status_of(checks, name) == FAIL
+        detail = next(c.detail for c in checks if c.name == name)
+        assert "requirements-databricks.txt" in detail
+        assert "cluster" not in detail
 
 
 def test_standard_runtime_advice_differs_from_serverless(cfg, monkeypatch):
     monkeypatch.setenv(DATABRICKS_ENV, "16.4.x-scala2.12")
     monkeypatch.setenv("DATABRICKS_USERNAME", "someone@example.com")
 
-    detail = next(c.detail for c in check_environment(cfg) if c.name == "Runtime ML")
+    detail = next(c.detail for c in check_environment(cfg) if c.name == "compute")
     assert "standard runtime" in detail
-    assert "serverless" not in detail.lower()
+
+
+def test_databricks_requirements_file_is_tracked(cfg):
+    """The serverless environment is only reproducible if its spec is in git."""
+    path = cfg.repo_root / cfg["compute"]["requirements"]
+    assert path.exists()
+    text = path.read_text(encoding="utf-8")
+    for name in ("torch", "mlflow", "openpyxl"):
+        assert name in text, name
+    assert "+cpu" in text or "%2Bcpu" in text, "the CUDA build is ~2.5 GB"
 
 
 # --- Username fallback ----------------------------------------------------

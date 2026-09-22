@@ -564,3 +564,49 @@ directory is an interim location.
 **Effect:** none on results. Reports from a cluster run land in the volume,
 so comparing them with the committed local reports means reading them from
 there.
+
+### D-33 Serverless compute replaces the Runtime ML cluster — *active*
+`CLAUDE.md` specifies a single-node CPU cluster on Databricks Runtime ML
+(LTS), and `HANDOVER.md` gave a cluster spec for it. **This workspace cannot
+run one.** Every classic cluster request, all-purpose or job, is rejected
+with *"Current organization … does not have any associated worker
+environments"*: the workspace has no classic compute plane. The Databricks
+CLI retries that error silently, so a `clusters create` call simply hangs;
+`--debug` shows it. The user chose serverless (`MLOPS.md`, D7).
+
+Serverless lacks PyTorch and MLflow, which the previous session took to
+mean it could not run the pipeline. A probe run on 2026-09-22 showed that
+an environment supplies them:
+
+| Piece | Where |
+|---|---|
+| Environment version | `compute.serverless_environment_version: "4"` in `configs/base.yaml`; Python 3.12.3 |
+| Packages serverless lacks | `requirements-databricks.txt`: CPU-only torch 2.6.0 wheel, mlflow 2.21.3, openpyxl 3.1.2 |
+| Everything else | provided by environment 4 |
+
+The CPU wheel is named explicitly because the PyPI build of torch for Linux
+pulls about 2.5 GB of CUDA libraries that serverless would download on
+every run.
+
+**Local pins follow the platform.** `CLAUDE.md` asks for the local venv to
+match the cluster's torch, numpy and pandas. Environment 4 has **numpy
+2.1.3**, where the replication ran on 1.26.4, so `requirements.txt` is
+re-pinned to environment 4: numpy 2.1.3, pyarrow 19.0.1, matplotlib 3.10.0,
+scipy 1.15.1, PyYAML 6.0.2 and pytest 8.3.5, with pandas 2.2.3, torch 2.6.0,
+mlflow 2.21.3 and openpyxl 3.1.2 unchanged. This closes D-01.
+
+**Preflight.** The "Runtime ML" check is now a **compute** check. An ML
+runtime passes. Serverless passes, with a warning if its environment
+version differs from config, because torch and mlflow are verified package
+by package anyway. A standard runtime still fails. On serverless, a missing
+torch or mlflow names `requirements-databricks.txt` rather than telling the
+user to create a cluster they cannot have.
+
+**Found along the way:** the handover's cluster spec set no
+`data_security_mode`. A classic cluster created through the API without
+one cannot read Unity Catalog volumes; ML runtimes need `SINGLE_USER`.
+It is moot here, but it matters for anyone reusing that spec elsewhere.
+
+**Effect:** none on the model or the method. Whether the numpy 1 → 2
+change moves any number is checked by rerunning the pipeline locally
+against the committed reports (M0).
