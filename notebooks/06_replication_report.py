@@ -20,7 +20,10 @@ from pathlib import Path
 REPO_ROOT = Path.cwd()
 while not (REPO_ROOT / "configs" / "base.yaml").exists() and REPO_ROOT != REPO_ROOT.parent:
     REPO_ROOT = REPO_ROOT.parent
-sys.path.insert(0, str(REPO_ROOT / "src"))
+try:
+    import acidity_lstm  # noqa: F401  installed as a wheel (Asset Bundle job)
+except ImportError:
+    sys.path.insert(0, str(REPO_ROOT / "src"))  # a Git folder or a plain checkout
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 for noisy in ("acidity_lstm.splits", "acidity_lstm.train", "acidity_lstm.windows"):

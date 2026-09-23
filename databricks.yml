@@ -1,0 +1,86 @@
+# Databricks Asset Bundle: the production training pipeline (MLOPS.md phase M3).
+#
+# One serverless job, preflight -> train_and_register, deployed per
+# environment. dev, staging and prod differ only in the Unity Catalog schema
+# the models are registered in (decision D8). The schemas exist already; they
+# are not bundle resources, because development mode would prefix their names.
+#
+# No workspace URL here (D6): the CLI profile or DATABRICKS_HOST supplies it.
+#   databricks bundle deploy -t dev -p <profile>
+#   databricks bundle run train -t dev -p <profile>
+
+bundle:
+  name: equity-silver-lstm
+
+variables:
+  catalog:
+    description: Unity Catalog catalog holding every environment's schema.
+    default: equity_silver_databricks_mlops
+  schema:
+    description: This environment's schema (MLOPS.md D8).
+
+# The package ships as a wheel, built from the same commit as the notebooks.
+artifacts:
+  acidity_lstm:
+    type: whl
+    build: uv build --wheel --out-dir dist
+    path: .
+
+resources:
+  jobs:
+    train:
+      name: equity-silver-train-${bundle.target}
+      description: >-
+        Backtest the candidate and incumbent recipes by held-out year, gate,
+        refit a 5-seed ensemble on every year and register it in
+        ${var.catalog}.${var.schema} (MLOPS.md D8-D10).
+      max_concurrent_runs: 1
+      tags:
+        project: equity-silver-lstm
+        environment: ${bundle.target}
+      tasks:
+        - task_key: preflight
+          notebook_task:
+            notebook_path: ./notebooks/00a_cluster_preflight.py
+          environment_key: pipeline
+        - task_key: train_and_register
+          depends_on:
+            - task_key: preflight
+          notebook_task:
+            notebook_path: ./notebooks/08_train_and_register.py
+            base_parameters:
+              schema: ${var.schema}
+              git_sha: ${bundle.git.commit}
+          environment_key: pipeline
+          timeout_seconds: 5400
+      environments:
+        - environment_key: pipeline
+          spec:
+            environment_version: "4"
+            dependencies:
+              - -r ${workspace.file_path}/requirements-databricks.txt
+              - ./dist/*.whl
+
+# staging and prod deploy under the deploying identity's home folder, which
+# M3c makes the CD service principal. Production mode requires an explicit
+# root_path; /Workspace/Shared would be writable by every workspace user.
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      schema: dev
+
+  staging:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      schema: staging
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      schema: prod
