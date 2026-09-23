@@ -205,6 +205,24 @@ def build_model(cfg: Config, n_features: int, hidden_size: int, kind: str = "lst
     raise ValueError(f"Unknown model kind {kind!r}; expected 'lstm' or 'fc'.")
 
 
+@torch.no_grad()
+def predict(model: nn.Module, X: np.ndarray, batch_size: int = 512) -> np.ndarray:
+    """Normalised predictions for `X`, evaluated in inference mode.
+
+    Lives here rather than in `evaluate` so that serving needs only torch,
+    not the plotting stack `evaluate` loads.
+    """
+    model.eval()
+    if len(X) == 0:
+        return np.empty(0, dtype=float)
+
+    out = []
+    tensor = torch.as_tensor(np.asarray(X, dtype=np.float32))
+    for i in range(0, len(tensor), batch_size):
+        out.append(model(tensor[i:i + batch_size]).cpu().numpy())
+    return np.concatenate(out).astype(float)
+
+
 def set_seed(seed: int) -> None:
     """Seed Python, NumPy and torch (CLAUDE.md rule 3)."""
     import random

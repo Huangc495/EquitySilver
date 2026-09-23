@@ -101,3 +101,29 @@ forecast:
 sensitivity:
   factors: [0.8, 1.2]
   variables: [precip, tmean]
+
+# Production models (MLOPS.md phase M2; decision D3). One registered model per
+# station; the champion and the shadow challenger are versions of it,
+# told apart by alias.
+registry:
+  catalog: equity_silver_databricks_mlops    # Unity Catalog, on Databricks
+  schema: default
+  model_name: "acidity_{station}"            # station lower-cased: acidity_bd
+  variant: paper                             # the training recipe (experiments.VARIANTS)
+  roles:
+    champion:
+      window_type: B
+      hidden_size: 10
+      time_tag: none
+    challenger:
+      window_type: B
+      hidden_size: 10
+      time_tag: per_step
+  # What a fresh environment needs to load the model. CPU-only torch: the
+  # default Linux wheel pulls about 2.5 GB of CUDA.
+  pip_requirements:
+    - "--extra-index-url https://download.pytorch.org/whl/cpu"
+    - "torch==2.6.0+cpu"
+    - "numpy==2.1.3"
+    - "pandas==2.2.3"
+    - "PyYAML==6.0.2"

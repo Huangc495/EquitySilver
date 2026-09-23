@@ -10,9 +10,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
 from torch import nn
 
+from .models import predict  # noqa: F401  (re-exported: evaluate.predict is public)
 from .scaling import Scaler
 from .splits import SPLIT_NAMES
 
@@ -47,20 +47,6 @@ def pearson_r(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.sqrt(mse(y_true, y_pred)))
-
-
-@torch.no_grad()
-def predict(model: nn.Module, X: np.ndarray, batch_size: int = 512) -> np.ndarray:
-    """Normalised predictions for `X`, evaluated in inference mode."""
-    model.eval()
-    if len(X) == 0:
-        return np.empty(0, dtype=float)
-
-    out = []
-    tensor = torch.as_tensor(np.asarray(X, dtype=np.float32))
-    for i in range(0, len(tensor), batch_size):
-        out.append(model(tensor[i:i + batch_size]).cpu().numpy())
-    return np.concatenate(out).astype(float)
 
 
 @dataclass

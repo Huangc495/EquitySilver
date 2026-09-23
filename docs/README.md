@@ -190,6 +190,7 @@ section 1, then **Run all**. Each notebook adds `src/` to `sys.path` itself.
 | `04_forecast` | 9-10 | `forecast_sensitivity.md`, Figs 11-12 |
 | `05_sensitivity` | 10 | Fig. 12 alone |
 | `06_replication_report` | 11 | `replication_report.md` |
+| `07_register_models` | M2 | champion and challenger per station, registered in Unity Catalog with their aliases |
 
 Reports go to `/Volumes/equity_silver_databricks_mlops/default/processed/reports`,
 not the Git folder, so a run never leaves tracked files modified (D-32).

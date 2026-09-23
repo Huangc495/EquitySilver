@@ -148,6 +148,54 @@ def _time_tag(
     return (anchor_day_number[:, None] - lag[None, :]).astype(float)
 
 
+def window_features(
+    arrays: WeatherArrays,
+    dates,
+    window_type: str,
+    n_steps: int,
+    with_time_tag: bool = False,
+    time_tag_mode: str = "per_step",
+    time_tag_origin="1998-01-01",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Input windows ending on each of `dates`: `(features, complete, day_number)`.
+
+    This is the single definition of a model input. Training
+    (`build_samples`) and serving (`serving.predict_from_weather`) both call
+    it, so the two cannot drift apart.
+
+    `features` has shape (N, n_steps, n_features) for every date. Rows whose
+    window has a NaN in either variable, or reaches outside the weather
+    record, carry meaningless values and are marked `complete` False. Nothing
+    is imputed.
+    """
+    anchor = arrays.offsets(dates)
+    idx = _day_index_matrix(anchor, n_steps, window_type)
+
+    # Windows reaching outside the weather record are invalid, not imputable.
+    in_range = (idx >= 0) & (idx < len(arrays))
+    safe = np.where(in_range, idx, 0)
+
+    precip = arrays.precip[safe]
+    tmean = arrays.tmean[safe]
+    valid = in_range & ~np.isnan(precip) & ~np.isnan(tmean)
+
+    if window_type == "A":
+        feat = np.stack([precip, tmean], axis=-1)              # (N, n_steps, 2)
+        complete = valid.all(axis=1)
+    else:
+        # Weekly precipitation is a sum; weekly temperature is a mean.
+        feat = np.stack([precip.sum(axis=2), tmean.mean(axis=2)], axis=-1)
+        complete = valid.all(axis=(1, 2))
+
+    origin = pd.Timestamp(time_tag_origin)
+    day_number = ((pd.to_datetime(pd.Series(np.asarray(dates))) - origin).dt.days + 1).to_numpy()
+
+    if with_time_tag:
+        tag = _time_tag(n_steps, window_type, day_number, time_tag_mode)
+        feat = np.concatenate([feat, tag[:, :, None]], axis=-1)
+    return feat, complete, day_number
+
+
 def build_samples(
     acidity: pd.DataFrame,
     weather,
@@ -176,33 +224,13 @@ def build_samples(
     if n_candidates == 0:
         raise ValueError("No acidity samples for station " + repr(station) + ".")
 
-    anchor = arrays.offsets(sub["date"])
-    idx = _day_index_matrix(anchor, n_steps, window_type)
-
-    # Windows reaching outside the weather record are invalid, not imputable.
-    in_range = (idx >= 0) & (idx < len(arrays))
-    safe = np.where(in_range, idx, 0)
-
-    precip = arrays.precip[safe]
-    tmean = arrays.tmean[safe]
-    valid = in_range & ~np.isnan(precip) & ~np.isnan(tmean)
-
-    if window_type == "A":
-        feat = np.stack([precip, tmean], axis=-1)              # (N, n_steps, 2)
-        keep = valid.all(axis=1)
-    else:
-        # Weekly precipitation is a sum; weekly temperature is a mean.
-        feat = np.stack([precip.sum(axis=2), tmean.mean(axis=2)], axis=-1)
-        keep = valid.all(axis=(1, 2))
-
-    feature_names = list(FEATURES)
-    origin = pd.Timestamp(wcfg["time_tag_origin"])
-    day_number = ((pd.to_datetime(sub["date"]) - origin).dt.days + 1).to_numpy()
-
-    if with_time_tag:
-        tag = _time_tag(n_steps, window_type, day_number, wcfg["time_tag"])
-        feat = np.concatenate([feat, tag[:, :, None]], axis=-1)
-        feature_names.append("day_number")
+    feat, keep, day_number = window_features(
+        arrays, sub["date"], window_type, n_steps,
+        with_time_tag=with_time_tag,
+        time_tag_mode=wcfg.get("time_tag", "per_step"),
+        time_tag_origin=wcfg["time_tag_origin"],
+    )
+    feature_names = list(FEATURES) + (["day_number"] if with_time_tag else [])
 
     meta = pd.DataFrame(
         {

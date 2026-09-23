@@ -655,3 +655,33 @@ pass locally or on Databricks before an experiment runs.
 **Effect:** none on results. The tests that lock the paper's sample
 counts, BD 365 and C7 384, are integration tests, so CI cannot catch a
 regression in them. Only a run with the data can.
+
+### D-35 The first registered models are the replication's own cells — *active*
+Phase M2 registers one model per station in Unity Catalog, with two
+versions told apart by alias (`MLOPS.md`, D3). The **champion** is Type B,
+H=10, untagged. The **challenger** is the same model with the per-step time
+tag, and it runs in shadow. Both are trained by the replication's own code
+(`experiments.run_cell`) under the paper recipe: random 70/15/15 split,
+scaler fitted on all samples, best of 5 by all-sample MSE. The champion is
+therefore the same model as the matching Table 1 / Fig. 6 cell, and the
+challenger the same as the Phase 8 model.
+
+This is a deliberate starting point, not the production recipe. It
+inherits D-22: best-of-5 on all-sample MSE favours the most overfit
+repeat. Phase M3's promotion gate re-judges models on held-out years, in
+R and RMSE in mg/L, across several seeds.
+
+**What serving adds.** The registered pyfunc takes raw daily weather and
+returns mg/L. It builds its inputs with `windows.window_features`, the
+function now shared with `build_samples`: the window code was factored out
+of `build_samples` unchanged, and every existing test still passes. It
+also carries its own scaler, and ships the package as `code_paths`. A test
+loads the registered model and checks that, fed the real weather, it
+returns the training code's predictions at every sample date. A missing
+day blanks every window that covers it, and nothing is imputed.
+
+`evaluate.predict` moved to `models.predict`, and `evaluate` re-exports
+it, so serving needs only torch and not the plotting stack.
+
+**Effect:** none on any replication result. The champion's quoted
+performance carries D-22's optimism until M3 re-judges it.

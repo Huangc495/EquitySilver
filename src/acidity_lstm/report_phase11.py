@@ -60,6 +60,7 @@ LIKELY_EFFECT = {
     "D-32": "None on results. Cluster reports land in a volume rather than the Git folder, so pulls cannot conflict.",
     "D-33": "None on the method. Serverless replaces Runtime ML; local pins move to numpy 2.1.3 to match, checked against the committed numbers.",
     "D-34": "None on results. CI proves the code without data; the paper-count tests still need a run where the data lives.",
+    "D-35": "None on replication results. The first champion inherits D-22's optimism until the M3 gate re-judges it on held-out years.",
     "Q-01": "Moderate. ~185 Type B samples make every metric noisy; run-to-run SD exceeds our mean gap to the paper.",
     "Q-02": "None, once tested. Type B still beats Type A on identical samples.",
     "Q-03": "Resolved in D-13.",
