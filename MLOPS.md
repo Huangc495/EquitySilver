@@ -146,7 +146,7 @@ The phases from `HANDOVER.md` section 9, adjusted for the decisions above.
 |---|---|---|---|
 | **M0** | Databricks baseline | Preflight fully green on serverless; notebooks 00–06 run on Databricks and reproduce the local numbers; D-01 closed from the platform's actual versions | **done** (approved 2026-09-22) |
 | **M1** | Packaging and CI | `pyproject.toml`; unit and integration tests separated by pytest markers; an **Azure Pipeline** running lint and unit tests on every pull request | **built and verified locally; waiting on the Azure Repos import and the agent** |
-| M2 | A registrable model | A pyfunc bundling weights, scaler and config, with a signature, registered in Unity Catalog; champion and shadow challenger per D3 | not started |
+| **M2** | A registrable model | A pyfunc bundling weights, scaler and config, with a signature, registered in Unity Catalog; champion and shadow challenger per D3 | **done, awaiting approval** |
 | M3 | Training pipeline and CD | An Asset Bundle deploying a training job to dev, staging and prod **from Azure Pipelines**, with the promotion gate below | not started |
 | M4 | Batch inference | A scheduled job scoring champion **and** shadow challenger into one Delta table | not started |
 | M5 | Monitoring | Input drift, prediction drift, window completeness, time-tag extrapolation distance, and delayed-label performance, with alert thresholds | not started |
@@ -312,3 +312,56 @@ substituted, including its mixed-slash paths, in a fresh clone with no
 in about 2.7 minutes. The replay also caught a real bug. An unquoted
 `echo ##vso[...]` line was cut short by YAML, which reads ` #` as the
 start of a comment, so the pipeline would never have found its Python.
+
+---
+
+## M2 results (2026-09-23)
+
+**Registered in Unity Catalog** by `notebooks/07_register_models.py`, run as a
+serverless job from the Git folder at `4fb3ee1` in 135 seconds:
+
+| Model | Alias | Version | R, all / test | RMSE, test (mg/L) |
+|---|---|---|---|---|
+| `equity_silver_databricks_mlops.default.acidity_bd` | `@champion` | 1 | 0.667 / 0.432 | 2786 |
+| | `@challenger` | 2 | 0.826 / 0.625 | 2450 |
+| `equity_silver_databricks_mlops.default.acidity_c7` | `@champion` | 1 | 0.556 / 0.140 | 5580 |
+| | `@challenger` | 2 | 0.672 / 0.266 | 5557 |
+
+The all-sample R values are the replication's: 0.67, 0.83 and 0.56 (Fig. 6
+and Phase 8). **Test R is much lower,** most of all at C7. That is D-22
+showing through: best-of-5 on all-sample MSE picks the repeat that fits
+the training rows best. M3's gate judges on held-out years instead.
+
+Each version carries `role`, `station`, `git_sha`, `data_sha256` (over the
+raw files), `recipe` and `best_seed` tags. Its run holds per-split R and
+RMSE in mg/L (D-18).
+
+**What a model is.** It is an MLflow pyfunc that takes raw daily weather
+(`date`, `precip_mm`, `tmean_c`) and returns one row per input day:
+`acidity_mgL`, `window_complete`, and `time_tag_z` for the challenger. It
+carries its scaler, a model spec and its weights, plus the package itself
+as `code_paths`, so it serves with the same window code that trained it
+(`windows.window_features`, now shared). Without a complete 70-day
+window the prediction is NaN, and nothing is imputed. The last three days
+of 2017 come back NaN for exactly that reason: a gap in the weather
+record.
+
+**Checked three ways:**
+
+| Check | Result |
+|---|---|
+| Serving against the training path, synthetic weather, with and without the tag | bit-identical |
+| `models:/acidity_bd@champion` and `@challenger` from a local registry, fed the real weather | the training code's own predictions at every sample date |
+| The Databricks-trained UC champion loaded on the development PC, against local training | within 0.0013 mg/L over all 185 BD samples; same best seed (45) |
+
+**Tests:** 294 pass with the data (15 serving, 8 registry). CI's selection
+passes 219 with the data hidden. Lint is clean.
+
+**Carried forward:**
+- M3 replaces the paper recipe with a production one: train on all the
+  data, and gate promotion on held-out years across seeds.
+- M4 scores with `@champion` and `@challenger` into one Delta table.
+- M5 monitors `window_complete` and `time_tag_z`.
+- MLflow logs a harmless `Py4JSecurityException` on serverless, because
+  one tag-context lookup is blocked there; it has no effect.
+
