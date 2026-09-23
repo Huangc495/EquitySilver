@@ -459,3 +459,43 @@ driven by noise.
 **Tests:** 311 pass with the data, 17 of them new for M3. CI's selection
 passes 235 with the data hidden.
 
+### M3b results (2026-09-23): the Asset Bundle
+
+`databricks.yml` defines a serverless job per environment,
+`preflight -> train_and_register`. dev, staging and prod differ only in
+schema (D8). The schemas `equity_silver_databricks_mlops.{dev,staging,prod}`
+were created once with the CLI. They are not bundle resources, because
+development mode would prefix their names.
+
+- **The package ships as a wheel.** The bundle builds it (`uv build`) and
+  the job environment installs it. The run confirmed `acidity_lstm` was
+  imported from `site-packages`. Notebooks now fall back to `src/` only
+  where nothing is installed.
+- **Lineage:** `git_sha` comes from `${bundle.git.commit}`. Deploy from a
+  committed tree, or the tag will name the previous commit.
+- **staging and prod** run in production mode, with `root_path` in the
+  deployer's home (`${workspace.current_user.userName}`), which M3c
+  makes the service principal's. No workspace URL is in the file.
+
+**First dev run**, from commit `9a76e28`: preflight 70 s, then train and
+register 102 s. With no incumbents in `dev`, each slot only had to clear
+the R floor:
+
+| Model (`...dev.`) | Alias | Version | Out-of-fold R | Out-of-fold RMSE (mg/L) | Refit epochs |
+|---|---|---|---|---|---|
+| `acidity_bd` | `@champion` | 1 | 0.542 | 2448 | 20 |
+| | `@challenger` | 2 | 0.694 | 2101 | 19 |
+| `acidity_c7` | `@champion` | 1 | 0.436 | 5213 | 17 |
+| | `@challenger` | 2 | 0.558 | 4805 | 19 |
+
+The out-of-fold figures match the local backtest to within 0.003 mg/L.
+
+**Deploying and running by hand:**
+
+```bash
+databricks bundle deploy -t dev -p <profile>
+databricks bundle run train -t dev -p <profile>
+```
+
+M3c moves the staging and prod deployments into Azure Pipelines.
+
