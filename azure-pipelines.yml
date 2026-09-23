@@ -1,60 +1,77 @@
 # CI for acidity-lstm (MLOPS.md phase M1; decision D5: Azure DevOps Pipelines).
 #
-# Runs on every pull request into main and every push to main: lint, unit
-# tests, then a wheel. The integration tests need the real Equity Silver data,
-# which is gitignored and never reaches CI, so they are deselected here and run
-# where the data lives: locally and on Databricks (DEVIATIONS.md D-34).
+# Lint, unit tests, then a wheel. The integration tests need the real Equity
+# Silver data, which is gitignored and never reaches CI, so they are
+# deselected here and run where the data lives: locally and on Databricks
+# (DEVIATIONS.md D-34).
 #
-# The code stays on GitHub. Azure Pipelines reads it through the Azure
-# Pipelines GitHub App, which is what makes the `pr` trigger below work.
+# The code lives in Azure Repos. `trigger` runs CI on every push to main.
+# Azure Repos ignores YAML `pr` triggers, so pull requests into main are
+# validated by a build-validation branch policy that points at this pipeline
+# (MLOPS.md, "M1: Azure DevOps setup").
 
 trigger:
   branches:
     include: [main]
 
-pr:
-  branches:
-    include: [main]
+parameters:
+  - name: agent
+    displayName: Build agent
+    type: string
+    default: self-hosted
+    values: [self-hosted, microsoft-hosted]
 
+# self-hosted: the Default pool, an agent on the development PC (MLOPS.md D5).
 pool:
-  vmImage: ubuntu-latest
+  ${{ if eq(parameters.agent, 'self-hosted') }}:
+    name: Default
+  ${{ else }}:
+    vmImage: ubuntu-latest
 
 variables:
   PYTHON_VERSION: "3.12"
-  PIP_CACHE_DIR: $(Pipeline.Workspace)/.pip
   # CPU-only PyTorch. The default Linux wheel pulls about 2.5 GB of CUDA.
   TORCH_INDEX: https://download.pytorch.org/whl/cpu
+  # A fresh environment per run, outside the checkout so ruff never lints it.
+  VENV: $(Agent.TempDirectory)/ci-venv
 
 steps:
-  - task: UsePythonVersion@0
-    displayName: Python $(PYTHON_VERSION)
-    inputs:
-      versionSpec: $(PYTHON_VERSION)
+  # Microsoft-hosted agents have Python in their tool cache but not uv. The
+  # development PC has uv on PATH but its `python` is an unrelated
+  # environment without pip, so both routes build the venv with uv.
+  - ${{ if eq(parameters.agent, 'microsoft-hosted') }}:
+      - task: UsePythonVersion@0
+        displayName: Python $(PYTHON_VERSION)
+        inputs:
+          versionSpec: $(PYTHON_VERSION)
+      - script: python -m pip install uv==0.11.15
+        displayName: Install uv
 
-  - task: Cache@2
-    displayName: Cache pip downloads
-    inputs:
-      key: 'pip | "$(Agent.OS)" | requirements.txt | requirements-dev.txt'
-      restoreKeys: |
-        pip | "$(Agent.OS)"
-      path: $(PIP_CACHE_DIR)
+  - script: uv venv "$(VENV)" --python $(PYTHON_VERSION) --seed
+    displayName: Create a clean Python $(PYTHON_VERSION) environment
 
-  - script: python -m pip install --upgrade pip
-    displayName: Upgrade pip
+  # Quoted: in YAML an unquoted ' #' starts a comment.
+  - script: 'echo ##vso[task.setvariable variable=PY]$(VENV)\Scripts\python.exe'
+    displayName: Locate Python (Windows)
+    condition: eq(variables['Agent.OS'], 'Windows_NT')
 
-  - script: python -m pip install torch==2.6.0 --index-url $(TORCH_INDEX)
+  - script: 'echo "##vso[task.setvariable variable=PY]$(VENV)/bin/python"'
+    displayName: Locate Python (Linux)
+    condition: ne(variables['Agent.OS'], 'Windows_NT')
+
+  - script: "\"$(PY)\" -m pip install torch==2.6.0 --index-url $(TORCH_INDEX)"
     displayName: Install PyTorch (CPU)
 
-  - script: python -m pip install -r requirements-dev.txt
+  - script: "\"$(PY)\" -m pip install -r requirements-dev.txt"
     displayName: Install pinned dependencies
 
-  - script: python -m pip install -e . --no-deps
+  - script: "\"$(PY)\" -m pip install -e . --no-deps"
     displayName: Install acidity-lstm
 
-  - script: python -m ruff check . --output-format azure
+  - script: "\"$(PY)\" -m ruff check . --output-format azure"
     displayName: Lint
 
-  - script: python -m pytest -m "not integration" --junitxml=$(Build.ArtifactStagingDirectory)/test-results.xml
+  - script: "\"$(PY)\" -m pytest -m \"not integration\" --junitxml=$(Build.ArtifactStagingDirectory)/test-results.xml"
     displayName: Unit tests
 
   - task: PublishTestResults@2
@@ -62,9 +79,9 @@ steps:
     condition: succeededOrFailed()
     inputs:
       testResultsFiles: $(Build.ArtifactStagingDirectory)/test-results.xml
-      testRunTitle: Unit tests, Python $(PYTHON_VERSION)
+      testRunTitle: Unit tests, Python $(PYTHON_VERSION), $(Agent.OS)
 
-  - script: python -m pip wheel . --no-deps --wheel-dir $(Build.ArtifactStagingDirectory)/dist
+  - script: "\"$(PY)\" -m pip wheel . --no-deps --wheel-dir $(Build.ArtifactStagingDirectory)/dist"
     displayName: Build wheel
 
   - task: PublishPipelineArtifact@1

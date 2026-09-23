@@ -81,9 +81,18 @@ The user chose Azure DevOps over the recommended GitHub Actions.
   short-lived Entra token through an `AzureCLI@2` task, and the Databricks CLI
   uses it with `DATABRICKS_AUTH_TYPE=azure-cli`. No long-lived secret is
   stored. This is the Azure DevOps equivalent of GitHub's OIDC.
-- **Code stays on GitHub** (decided at M1). Azure Pipelines reads it
-  through the Azure Pipelines GitHub App. No Azure DevOps organization
-  existed, so the user creates one (see "M1: Azure DevOps setup").
+- **The code moves to Azure Repos** (decided at M1). The user first chose
+  to stay on GitHub, then chose Azure Repos when creating the pipeline.
+  Azure Repos is private at no cost, and it can *enforce* pull-request
+  build validation as a branch policy, which GitHub Free cannot do on a
+  private repository. GitHub becomes a read-only archive. Until the
+  Databricks Git folder is re-pointed to Azure Repos (M3), commits are also
+  pushed to GitHub so the workspace can pull them.
+- **CI runs on a self-hosted agent on the development PC** (decided at M1).
+  It is free and available immediately, whereas a new organization gets no
+  Microsoft-hosted agent until Microsoft approves a grant. CI therefore runs
+  only while the agent is running. `azure-pipelines.yml` takes an `agent`
+  parameter, so switching to Microsoft-hosted later is one setting.
 
 ### D6 Make the repository private
 
@@ -97,12 +106,12 @@ Consequences:
 - **The Databricks Git folder needs credentials to pull.** Link GitHub under
   **User Settings > Linked accounts** in the workspace, or pulls will fail
   once the repo is private.
-- **Azure Pipelines needs access too**, through its GitHub service connection
-  (see D5).
-- **GitHub Free cannot enforce required checks on a private repository.**
-  Branch protection and rulesets on private repositories need GitHub Pro.
-  CI still runs and reports on every pull request; it just cannot block a
-  merge.
+- **Superseded in part at M1:** the code moved to a private Azure Repos
+  repository (D5), and GitHub becomes an archive. Once the Databricks Git
+  folder no longer pulls from GitHub, make the GitHub repository private
+  *and* archived (**Settings > General > Danger Zone > Archive this
+  repository**). Until then it stays public, so the rule below still
+  applies to everything pushed.
 - **Until the repository is confirmed private, commit no deployment
   identifiers:** no workspace URL, service principal ID or Azure DevOps
   organization. Keep them in environment variables or pipeline variables, as
@@ -136,7 +145,7 @@ The phases from `HANDOVER.md` section 9, adjusted for the decisions above.
 | Phase | Goal | Done when | Status |
 |---|---|---|---|
 | **M0** | Databricks baseline | Preflight fully green on serverless; notebooks 00–06 run on Databricks and reproduce the local numbers; D-01 closed from the platform's actual versions | **done** (approved 2026-09-22) |
-| **M1** | Packaging and CI | `pyproject.toml`; unit and integration tests separated by pytest markers; an **Azure Pipeline** running lint and unit tests on every pull request | **built and verified locally; waiting on the Azure DevOps organization** |
+| **M1** | Packaging and CI | `pyproject.toml`; unit and integration tests separated by pytest markers; an **Azure Pipeline** running lint and unit tests on every pull request | **built and verified locally; waiting on the Azure Repos import and the agent** |
 | M2 | A registrable model | A pyfunc bundling weights, scaler and config, with a signature, registered in Unity Catalog; champion and shadow challenger per D3 | not started |
 | M3 | Training pipeline and CD | An Asset Bundle deploying a training job to dev, staging and prod **from Azure Pipelines**, with the promotion gate below | not started |
 | M4 | Batch inference | A scheduled job scoring champion **and** shadow challenger into one Delta table | not started |
@@ -256,29 +265,50 @@ organization below.
 
 ## M1: Azure DevOps setup (user)
 
-1. **Create the organization.** Go to <https://dev.azure.com> and sign in
-   with the Microsoft account you use for Azure. Choose **New
-   organization**, pick a name, set the region to **Canada Central**, and
-   continue.
-2. **Create a project** named `EquitySilver`, visibility **Private**.
-3. **Get a build agent.** A new organization has no free
-   Microsoft-hosted agent. Choose one of:
-   - **Request the free grant** at <https://aka.ms/azpipelines-parallelism-request>.
-     It takes about 2–3 business days. After that, `azure-pipelines.yml`
-     runs as written.
-   - **Run a self-hosted agent on this PC.** It is free and works
-     immediately. Go to **Project settings > Agent pools > Default > New
-     agent > Windows**. `pool:` then becomes `name: Default`, and the agent
-     needs Python 3.12 in its tool cache.
-   - **Buy a Microsoft-hosted parallel job**, about US$40/month, under
-     **Organization settings > Billing**.
-4. **Create the pipeline.** Go to **Pipelines > Create Pipeline > GitHub
-   (YAML)**. Authorize the **Azure Pipelines** GitHub App, and grant it
-   *only* `Huangc495/EquitySilver`. Select the repository, choose
-   **Existing Azure Pipelines YAML file**, set branch `main` and path
-   `/azure-pipelines.yml`, then **Run**.
-5. **Optional: require the check on GitHub.** Go to **Settings > Rules >
-   Rulesets > New branch ruleset** on `main` and require the pipeline's
-   status check. This only works on a private repository with GitHub Pro
-   (see D6).
+The organization and project exist. The names are kept out of this file
+while GitHub is still public (D6). The steps:
 
+1. **Import the code.** Go to **Repos > Files**. The project's repository
+   is empty, so the page offers **Import a repository**. Choose **Import**,
+   set the clone URL to `https://github.com/Huangc495/EquitySilver.git`, and
+   import. GitHub is public, so no credentials are needed, and the full
+   history comes across.
+2. **Install the agent on this PC.**
+   - Create a personal access token: **User settings (top right) >
+     Personal access tokens > New Token**, scope **Agent Pools (Read &
+     manage)**, 7-day expiry. Only the agent's configuration uses it.
+   - Go to **Project settings > Agent pools > Default > New agent >
+     Windows** and download the zip.
+   - Unpack it into **`C:\agent`**. A short path matters: one of the
+     packages CI installs has a file path near Windows' 260-character
+     limit.
+   - In PowerShell, in `C:\agent`, run `.\config.cmd`. Give it the
+     organization URL, choose PAT authentication, paste the token, and
+     accept the `Default` pool and the default work folder. Answer **N**
+     to running as a service.
+   - Start it with `.\run.cmd` whenever CI should run. Running it
+     interactively under your own account is what gives it `uv` and
+     Python 3.12: a service account would have neither.
+3. **Create the pipeline.** Go to **Pipelines > New pipeline > Azure Repos
+   Git**, pick the repository, choose **Existing Azure Pipelines YAML
+   file**, set branch `main` and path `/azure-pipelines.yml`, then **Run**.
+   If it asks for permission to use the `Default` pool, choose **Permit**.
+4. **Require CI on pull requests.** Go to **Project settings >
+   Repositories > (repository) > Policies**, open branch policies for
+   `main`, and add **Build validation** with this pipeline: trigger
+   automatic, policy required. **Any branch policy on `main` blocks direct
+   pushes**, so every change then arrives through a pull request.
+
+After step 1, this machine's `origin` moves to Azure Repos, and GitHub
+stays as a second remote named `github`. The first fetch opens a browser
+sign-in through Git Credential Manager.
+
+### Verification before handing over
+
+The pipeline was replayed as the Windows agent runs it: each script step
+written to a `.cmd` file and run through `cmd.exe`, with the agent's macros
+substituted, including its mixed-slash paths, in a fresh clone with no
+`data/`. Every step passed: 200 unit tests passed and 71 were deselected,
+in about 2.7 minutes. The replay also caught a real bug. An unquoted
+`echo ##vso[...]` line was cut short by YAML, which reads ` #` as the
+start of a comment, so the pipeline would never have found its Python.
