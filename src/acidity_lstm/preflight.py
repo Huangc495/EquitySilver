@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import Config, expand_env, on_databricks
+from .config import Config, on_databricks
 
 # Distribution names as they appear in requirements.txt.
 PINNED = ("numpy", "pandas", "pyarrow", "torch", "matplotlib",

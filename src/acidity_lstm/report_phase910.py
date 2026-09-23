@@ -13,7 +13,6 @@ import pandas as pd
 
 from .audit import _md_table, w
 from .config import Config
-from .evaluate import predict
 from .forecast import PAPER_FORECAST, PREDICT_SPLIT, ForecastResult
 
 log = logging.getLogger(__name__)

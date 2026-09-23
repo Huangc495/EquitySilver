@@ -1,0 +1,74 @@
+# CI for acidity-lstm (MLOPS.md phase M1; decision D5: Azure DevOps Pipelines).
+#
+# Runs on every pull request into main and every push to main: lint, unit
+# tests, then a wheel. The integration tests need the real Equity Silver data,
+# which is gitignored and never reaches CI, so they are deselected here and run
+# where the data lives: locally and on Databricks (DEVIATIONS.md D-34).
+#
+# The code stays on GitHub. Azure Pipelines reads it through the Azure
+# Pipelines GitHub App, which is what makes the `pr` trigger below work.
+
+trigger:
+  branches:
+    include: [main]
+
+pr:
+  branches:
+    include: [main]
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  PYTHON_VERSION: "3.12"
+  PIP_CACHE_DIR: $(Pipeline.Workspace)/.pip
+  # CPU-only PyTorch. The default Linux wheel pulls about 2.5 GB of CUDA.
+  TORCH_INDEX: https://download.pytorch.org/whl/cpu
+
+steps:
+  - task: UsePythonVersion@0
+    displayName: Python $(PYTHON_VERSION)
+    inputs:
+      versionSpec: $(PYTHON_VERSION)
+
+  - task: Cache@2
+    displayName: Cache pip downloads
+    inputs:
+      key: 'pip | "$(Agent.OS)" | requirements.txt | requirements-dev.txt'
+      restoreKeys: |
+        pip | "$(Agent.OS)"
+      path: $(PIP_CACHE_DIR)
+
+  - script: python -m pip install --upgrade pip
+    displayName: Upgrade pip
+
+  - script: python -m pip install torch==2.6.0 --index-url $(TORCH_INDEX)
+    displayName: Install PyTorch (CPU)
+
+  - script: python -m pip install -r requirements-dev.txt
+    displayName: Install pinned dependencies
+
+  - script: python -m pip install -e . --no-deps
+    displayName: Install acidity-lstm
+
+  - script: python -m ruff check . --output-format azure
+    displayName: Lint
+
+  - script: python -m pytest -m "not integration" --junitxml=$(Build.ArtifactStagingDirectory)/test-results.xml
+    displayName: Unit tests
+
+  - task: PublishTestResults@2
+    displayName: Publish test results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFiles: $(Build.ArtifactStagingDirectory)/test-results.xml
+      testRunTitle: Unit tests, Python $(PYTHON_VERSION)
+
+  - script: python -m pip wheel . --no-deps --wheel-dir $(Build.ArtifactStagingDirectory)/dist
+    displayName: Build wheel
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish wheel
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory)/dist
+      artifact: wheel

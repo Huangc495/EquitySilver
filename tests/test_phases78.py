@@ -23,6 +23,10 @@ from acidity_lstm.preprocess import clean_acidity, clean_weather
 from acidity_lstm.scaling import fit_scaler_for
 
 
+# Every test here reads the real data (DEVIATIONS.md D-34).
+pytestmark = pytest.mark.integration
+
+
 @pytest.fixture(scope="module")
 def data():
     cfg = load_config()

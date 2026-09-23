@@ -12,7 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from acidity_lstm.config import Config, load_config
-from acidity_lstm.scaling import Scaler, fit_scaler, fit_scaler_for
+from acidity_lstm.scaling import fit_scaler, fit_scaler_for
 from acidity_lstm.windows import SampleSet
 
 

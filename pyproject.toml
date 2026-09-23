@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acidity-lstm"
+dynamic = ["version"]
+description = "Replication of Ma et al. (2021): an LSTM relating drainage acidity to weather at the Equity Silver waste rock pile"
+readme = "docs/README.md"
+requires-python = ">=3.12"
+# Floors only. The exact versions live in requirements.txt, pinned to the
+# Databricks serverless environment (DEVIATIONS.md D-01, D-33).
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=15",
+    "torch>=2.6",
+    "matplotlib>=3.8",
+    "openpyxl>=3.1",
+    "PyYAML>=6.0",
+    "mlflow>=2.21",
+    "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.16"]
+
+[tool.setuptools.dynamic]
+version = { attr = "acidity_lstm.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+markers = [
+    "integration: reads the real Equity Silver data (gitignored data/raw); CI deselects these with -m 'not integration'",
+]
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+# Explicit, so a ruff upgrade cannot silently widen what CI enforces:
+# pyflakes, plus pycodestyle's import, statement and syntax error classes.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Databricks notebooks and tests put src/ on sys.path before importing.
+"notebooks/*.py" = ["E402"]
+"tests/*.py" = ["E402"]

@@ -216,12 +216,25 @@ def test_local_reports_stay_in_the_repo(monkeypatch):
     assert cfg.reports_dir == cfg.repo_root / "reports"
 
 
+@pytest.mark.integration
 def test_local_paths_are_absolute_and_point_at_real_data(monkeypatch):
     monkeypatch.delenv(DATABRICKS_ENV, raising=False)
     cfg = load_config()
     assert cfg.resolve("acidity_excel").is_absolute()
     assert cfg.resolve("acidity_excel").exists()
     assert cfg.reports_dir.is_absolute()
+
+
+def test_repo_root_follows_the_config_file(tmp_path):
+    """An installed wheel sits in site-packages; the root must come from the config."""
+    source = load_config()
+    (tmp_path / "configs").mkdir()
+    copied = tmp_path / "configs" / "base.yaml"
+    copied.write_text((source.repo_root / "configs" / "base.yaml").read_text(encoding="utf-8"),
+                      encoding="utf-8")
+    cfg = load_config(copied)
+    assert cfg.repo_root == tmp_path.resolve()
+    assert load_config().repo_root == source.repo_root
 
 
 def test_resolution_is_independent_of_the_working_directory(monkeypatch, tmp_path):

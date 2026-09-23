@@ -48,12 +48,14 @@ def status_of(checks, name: str) -> str:
 
 # --- Happy path -----------------------------------------------------------
 
+@pytest.mark.integration
 def test_preflight_passes_on_the_real_local_setup(cfg):
     passed, table = run_preflight(cfg, verbose=False)
     assert passed, table[table["status"] == FAIL].to_string()
     assert set(table["area"]) == {"environment", "data", "packages"}
 
 
+@pytest.mark.integration
 def test_finds_all_the_weather_files(cfg):
     checks = check_paths(cfg)
     assert status_of(checks, "weather CSVs") == OK
@@ -171,6 +173,7 @@ def test_version_mismatch_warns_rather_than_fails(cfg, tmp_path):
     assert all(c.ok for c in checks)
 
 
+@pytest.mark.integration
 def test_a_warning_alone_does_not_fail_the_run(cfg, monkeypatch):
     """The reports dir check is warn-only; it must never block a run."""
     from acidity_lstm import preflight

@@ -203,10 +203,23 @@ the processed parquet they read.
 
 ## 6. Check it first
 
+Install the package in editable mode once, with the pinned tools:
+
 ```bash
-pytest
+pip install -r requirements-dev.txt
+pip install -e . --no-deps
 ```
 
-CLAUDE.md rule 6: the suite must pass before any experiment phase runs. It
-needs the raw data in place, since several tests assert against the real
-sample counts.
+Then:
+
+| Command | Runs | Needs the data |
+|---|---|---|
+| `pytest` | everything; integration tests are **skipped** if `data/raw` is missing | no, but the skips cover the paper's sample counts |
+| `pytest -m "not integration"` | the unit tests, which is what CI runs | no |
+| `ACIDITY_REQUIRE_DATA=1 pytest` | everything, and **fails** if the data is missing | yes |
+| `ruff check .` | lint, as CI runs it | no |
+
+CLAUDE.md rule 6: the full suite must pass before any experiment phase runs.
+The 71 tests marked `integration` assert against the real data, including
+the paper's sample counts, so run them where the data lives (DEVIATIONS.md
+D-34). CI runs the rest on every pull request, from `azure-pipelines.yml`.

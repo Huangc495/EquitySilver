@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -52,6 +51,7 @@ def forecast(data):
 
 # --- Sample construction --------------------------------------------------
 
+@pytest.mark.integration
 def test_forecast_split_is_time_based(data):
     cfg, acidity, weather = data
     s, _ = build_forecast_samples(cfg, acidity, weather, seed=42)
@@ -66,6 +66,7 @@ def test_forecast_split_is_time_based(data):
         assert set(years[split == name]) <= set(range(tr0, tr1 + 1))
 
 
+@pytest.mark.integration
 def test_forecast_counts_match_phase2(data):
     """161 training-period samples and 24 forecast samples (Phase 2 report)."""
     cfg, acidity, weather = data
@@ -75,6 +76,7 @@ def test_forecast_counts_match_phase2(data):
     assert counts[PREDICT_SPLIT] == 24
 
 
+@pytest.mark.integration
 def test_train_validation_ratio_is_80_20(data):
     cfg, acidity, weather = data
     s, _ = build_forecast_samples(cfg, acidity, weather, seed=42)
@@ -84,6 +86,7 @@ def test_train_validation_ratio_is_80_20(data):
     assert counts["val"] == n - counts["train"]
 
 
+@pytest.mark.integration
 def test_no_held_out_test_inside_the_training_period(data):
     """CLAUDE.md: 80/20 train/validation, no test set within 1999-2014."""
     cfg, acidity, weather = data
@@ -94,6 +97,7 @@ def test_no_held_out_test_inside_the_training_period(data):
     assert not (s.meta["split"].to_numpy()[in_train_period] == PREDICT_SPLIT).any()
 
 
+@pytest.mark.integration
 def test_1998_and_2017_are_excluded(data):
     cfg, acidity, weather = data
     s, _ = build_forecast_samples(cfg, acidity, weather, seed=42)
@@ -101,6 +105,7 @@ def test_1998_and_2017_are_excluded(data):
     assert 1998 not in years and 2017 not in years
 
 
+@pytest.mark.integration
 def test_samples_carry_the_time_tag(data):
     cfg, acidity, weather = data
     s, _ = build_forecast_samples(cfg, acidity, weather, seed=42)
@@ -110,6 +115,7 @@ def test_samples_carry_the_time_tag(data):
 
 # --- The scaler must not see the forecast period --------------------------
 
+@pytest.mark.integration
 def test_scaler_is_fitted_on_the_training_period_only(data):
     cfg, acidity, weather = data
     s, scaler = build_forecast_samples(cfg, acidity, weather, seed=42)
@@ -122,6 +128,7 @@ def test_scaler_is_fitted_on_the_training_period_only(data):
     assert not np.isclose(scaler.y_mean, float(s.y.mean()))
 
 
+@pytest.mark.integration
 def test_time_tag_extrapolates_beyond_the_training_range(data):
     """The caveat CLAUDE.md asks to be reported."""
     cfg, acidity, weather = data
@@ -139,6 +146,7 @@ def test_time_tag_extrapolates_beyond_the_training_range(data):
 
 # --- Selection ------------------------------------------------------------
 
+@pytest.mark.integration
 def test_best_is_selected_on_train_plus_validation_not_the_forecast(forecast):
     """Selecting on the forecast would leak the answer."""
     cfg, fc = forecast
@@ -168,6 +176,7 @@ def test_combined_mse_ignores_empty_splits():
     assert combined_mse(ev, ("train", "val")) == pytest.approx(0.4)
 
 
+@pytest.mark.integration
 def test_forecast_reports_a_spread(forecast):
     cfg, fc = forecast
     sp = fc.spread()
@@ -176,6 +185,7 @@ def test_forecast_reports_a_spread(forecast):
     assert np.isfinite(sp["sd"])
 
 
+@pytest.mark.integration
 def test_forecast_metrics_are_finite(forecast):
     cfg, fc = forecast
     assert np.isfinite(fc.train_val_mse())
@@ -185,6 +195,7 @@ def test_forecast_metrics_are_finite(forecast):
 
 # --- Perturbation ---------------------------------------------------------
 
+@pytest.mark.integration
 def test_perturb_scales_only_inside_the_range(data):
     cfg, acidity, weather = data
     out = perturb_weather(weather, "precip", 1.2, "2015-01-01", "2016-12-31")
@@ -202,6 +213,7 @@ def test_perturb_scales_only_inside_the_range(data):
     )
 
 
+@pytest.mark.integration
 def test_perturb_leaves_the_other_variable_alone(data):
     cfg, acidity, weather = data
     out = perturb_weather(weather, "precip", 0.8, "2015-01-01", "2016-12-31")
@@ -209,6 +221,7 @@ def test_perturb_leaves_the_other_variable_alone(data):
                        weather["tmean_c"].to_numpy(), equal_nan=True)
 
 
+@pytest.mark.integration
 def test_perturb_with_factor_one_is_the_identity(data):
     cfg, acidity, weather = data
     out = perturb_weather(weather, "tmean", 1.0, "2015-01-01", "2016-12-31")
@@ -216,6 +229,7 @@ def test_perturb_with_factor_one_is_the_identity(data):
                        weather["tmean_c"].to_numpy(), equal_nan=True)
 
 
+@pytest.mark.integration
 def test_perturb_does_not_mutate_the_input(data):
     cfg, acidity, weather = data
     before = weather["precip_mm"].to_numpy().copy()
@@ -223,6 +237,7 @@ def test_perturb_does_not_mutate_the_input(data):
     assert np.allclose(weather["precip_mm"].to_numpy(), before, equal_nan=True)
 
 
+@pytest.mark.integration
 def test_temperature_scaling_widens_the_swing_both_ways(data):
     """Scaling degrees C amplifies summer highs and winter lows together."""
     cfg, acidity, weather = data
@@ -235,6 +250,7 @@ def test_temperature_scaling_widens_the_swing_both_ways(data):
     assert wide.min() < base.min()
 
 
+@pytest.mark.integration
 def test_unknown_variable_raises(data):
     cfg, acidity, weather = data
     with pytest.raises(ValueError, match="Unknown variable"):
@@ -250,6 +266,7 @@ def sensitivity(data, forecast):
     return run_sensitivity(cfg, acidity, weather, fc, mlflow=None)
 
 
+@pytest.mark.integration
 def test_sensitivity_covers_every_scenario(sensitivity):
     table, curves, meta = sensitivity
     assert len(table) == 5                       # baseline + 2 variables x 2 factors
@@ -258,12 +275,14 @@ def test_sensitivity_covers_every_scenario(sensitivity):
     assert table.loc[0, "mean_change_mgL"] == 0.0
 
 
+@pytest.mark.integration
 def test_sensitivity_curves_align_with_the_same_samples(sensitivity):
     table, curves, meta = sensitivity
     lengths = {len(v) for v in curves.values()}
     assert lengths == {len(meta)} == {24}
 
 
+@pytest.mark.integration
 def test_perturbation_changes_the_predictions(sensitivity):
     table, curves, meta = sensitivity
     base = curves["Real weather"]
@@ -273,6 +292,7 @@ def test_perturbation_changes_the_predictions(sensitivity):
         assert not np.allclose(values, base), f"{label} had no effect"
 
 
+@pytest.mark.integration
 def test_sensitivity_directions_match_the_paper(sensitivity):
     """More precipitation lowers acidity; a wider temperature swing raises it."""
     table, _, _ = sensitivity
@@ -283,6 +303,7 @@ def test_sensitivity_directions_match_the_paper(sensitivity):
     assert tmean.loc[1.2, "mean_change_mgL"] > 0 > tmean.loc[0.8, "mean_change_mgL"]
 
 
+@pytest.mark.integration
 def test_temperature_is_the_more_sensitive_input(sensitivity):
     table, _, _ = sensitivity
     precip = table[table["variable"] == "precip"]["mean_change_pct"].abs().sum()
@@ -290,6 +311,7 @@ def test_temperature_is_the_more_sensitive_input(sensitivity):
     assert tmean > precip
 
 
+@pytest.mark.integration
 def test_sensitivity_predictions_are_in_mgL(sensitivity):
     table, curves, _ = sensitivity
     for values in curves.values():

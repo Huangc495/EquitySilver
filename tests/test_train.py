@@ -13,7 +13,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from acidity_lstm.config import Config, load_config
-from acidity_lstm.evaluate import evaluate_model, mse, pearson_r, predict, rmse
+from acidity_lstm.evaluate import mse, pearson_r, predict, rmse
 from acidity_lstm.models import set_seed
 from acidity_lstm.scaling import fit_scaler_for
 from acidity_lstm.train import best_of, summarise_repeats, train_model, train_repeats
@@ -326,6 +326,7 @@ def test_summarise_repeats_reports_mean_sd_and_best(cfg):
 
 # --- End to end on the real data -----------------------------------------
 
+@pytest.mark.integration
 def test_end_to_end_on_real_bd_type_b(cfg):
     """A short real run: the pipeline holds together and learns something."""
     from acidity_lstm.preprocess import clean_acidity, clean_weather

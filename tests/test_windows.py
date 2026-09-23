@@ -304,6 +304,7 @@ def real_data():
     return c, weather, acidity
 
 
+@pytest.mark.integration
 def test_real_survival_counts(real_data):
     cfg_r, weather, acidity = real_data
     sets = build_sample_sets(acidity, weather, cfg_r)
@@ -316,6 +317,7 @@ def test_real_survival_counts(real_data):
     }
 
 
+@pytest.mark.integration
 def test_real_type_b_is_a_subset_of_type_a(real_data):
     cfg_r, weather, acidity = real_data
     sets = build_sample_sets(acidity, weather, cfg_r)
@@ -325,6 +327,7 @@ def test_real_type_b_is_a_subset_of_type_a(real_data):
         assert b <= a, f"{station}: Type B survivors must all survive Type A"
 
 
+@pytest.mark.integration
 def test_real_samples_have_no_nan_features(real_data):
     cfg_r, weather, acidity = real_data
     for tag in (False, True):
@@ -335,6 +338,7 @@ def test_real_samples_have_no_nan_features(real_data):
             assert s.X.dtype == np.float32
 
 
+@pytest.mark.integration
 def test_real_time_tag_adds_a_third_feature(real_data):
     cfg_r, weather, acidity = real_data
     plain = build_sample_sets(acidity, weather, cfg_r, stations=["BD"], types=["B"])

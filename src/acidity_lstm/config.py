@@ -144,11 +144,19 @@ class Config:
 
 
 def load_config(path: str | Path | None = None) -> Config:
-    """Load the YAML config and pick the local or Databricks path set."""
+    """Load the YAML config and pick the local or Databricks path set.
+
+    The repo root is taken from the config's own location
+    (`<root>/configs/base.yaml`), not from where this module is installed.
+    The two agree in a checkout or an editable install, but an installed
+    wheel lives in site-packages, where no `requirements.txt`,
+    `DEVIATIONS.md` or `reports/` exists. Pass the path explicitly there, as
+    every notebook does.
+    """
     cfg_path = Path(path) if path is not None else _REPO_ROOT / "configs" / "base.yaml"
     with open(cfg_path, "r", encoding="utf-8") as fh:
         raw = yaml.safe_load(fh)
 
     key = "databricks" if on_databricks() else "local"
     paths = dict(raw["paths"][key])
-    return Config(raw=raw, paths=paths, repo_root=_REPO_ROOT)
+    return Config(raw=raw, paths=paths, repo_root=cfg_path.resolve().parents[1])

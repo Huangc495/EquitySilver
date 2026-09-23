@@ -45,6 +45,7 @@ def with_overrides(cfg: Config, **section_updates) -> Config:
 
 # --- Weather --------------------------------------------------------------
 
+@pytest.mark.integration
 def test_weather_is_a_continuous_daily_calendar(cfg, cleaned):
     weather, _, _ = cleaned
     expected = pd.date_range(
@@ -56,6 +57,7 @@ def test_weather_is_a_continuous_daily_calendar(cfg, cleaned):
     assert list(weather.columns) == ["date", "precip_mm", "tmean_c"]
 
 
+@pytest.mark.integration
 def test_weather_gaps_are_never_imputed(cleaned):
     weather, _, _ = cleaned
     # The audit found 781 / 1038 missing values; cleaning must not fill them.
@@ -65,6 +67,7 @@ def test_weather_gaps_are_never_imputed(cleaned):
     assert weather["tmean_c"].isna().sum() == 1038
 
 
+@pytest.mark.integration
 def test_weather_values_are_physically_plausible(cleaned):
     weather, _, _ = cleaned
     p = weather["precip_mm"].dropna()
@@ -112,18 +115,21 @@ def test_reindex_inserts_nan_rows_for_absent_dates(cfg):
 
 # --- Acidity --------------------------------------------------------------
 
+@pytest.mark.integration
 def test_acidity_counts_match_the_paper(cleaned):
     """The headline Phase 0 finding, locked as a regression test."""
     _, acidity, _ = cleaned
     assert acidity.groupby("station").size().to_dict() == PAPER_COUNTS
 
 
+@pytest.mark.integration
 def test_blank_acidity_cells_are_dropped(cleaned):
     _, acidity, arep = cleaned
     assert arep.acidity_non_numeric == 5
     assert acidity["acidity_mgL"].notna().all()
 
 
+@pytest.mark.integration
 def test_acidity_is_clipped_to_the_study_period(cfg, cleaned):
     _, acidity, _ = cleaned
     start = pd.Timestamp(cfg["data"]["acidity_start"])
@@ -133,12 +139,14 @@ def test_acidity_is_clipped_to_the_study_period(cfg, cleaned):
     assert acidity["date"].min() >= start
 
 
+@pytest.mark.integration
 def test_acidity_has_no_same_day_duplicates(cleaned):
     _, acidity, arep = cleaned
     assert arep.acidity_duplicate_dates == 0
     assert not acidity.duplicated(["station", "date"]).any()
 
 
+@pytest.mark.integration
 def test_acidity_is_sorted_and_positive(cleaned):
     _, acidity, _ = cleaned
     assert acidity.equals(
@@ -215,6 +223,7 @@ def test_gap_runs_with_no_missing_values():
     assert len(runs) == 0
 
 
+@pytest.mark.integration
 def test_gap_runs_total_matches_missing_count(cleaned):
     weather, _, _ = cleaned
     either = weather["precip_mm"].isna() | weather["tmean_c"].isna()

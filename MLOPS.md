@@ -81,9 +81,9 @@ The user chose Azure DevOps over the recommended GitHub Actions.
   short-lived Entra token through an `AzureCLI@2` task, and the Databricks CLI
   uses it with `DATABRICKS_AUTH_TYPE=azure-cli`. No long-lived secret is
   stored. This is the Azure DevOps equivalent of GitHub's OIDC.
-- **Open for M1:** whether the code stays on GitHub, with Azure Pipelines
-  reading it through a GitHub service connection, or moves to Azure Repos.
-  Also whether an Azure DevOps organization and project already exist.
+- **Code stays on GitHub** (decided at M1). Azure Pipelines reads it
+  through the Azure Pipelines GitHub App. No Azure DevOps organization
+  existed, so the user creates one (see "M1: Azure DevOps setup").
 
 ### D6 Make the repository private
 
@@ -99,6 +99,10 @@ Consequences:
   once the repo is private.
 - **Azure Pipelines needs access too**, through its GitHub service connection
   (see D5).
+- **GitHub Free cannot enforce required checks on a private repository.**
+  Branch protection and rulesets on private repositories need GitHub Pro.
+  CI still runs and reports on every pull request; it just cannot block a
+  merge.
 - **Until the repository is confirmed private, commit no deployment
   identifiers:** no workspace URL, service principal ID or Azure DevOps
   organization. Keep them in environment variables or pipeline variables, as
@@ -131,8 +135,8 @@ The phases from `HANDOVER.md` section 9, adjusted for the decisions above.
 
 | Phase | Goal | Done when | Status |
 |---|---|---|---|
-| **M0** | Databricks baseline | Preflight fully green on serverless; notebooks 00–06 run on Databricks and reproduce the local numbers; D-01 closed from the platform's actual versions | **done, awaiting approval** |
-| M1 | Packaging and CI | `pyproject.toml`; unit and integration tests separated by pytest markers; an **Azure Pipeline** running lint and unit tests on every pull request | not started |
+| **M0** | Databricks baseline | Preflight fully green on serverless; notebooks 00–06 run on Databricks and reproduce the local numbers; D-01 closed from the platform's actual versions | **done** (approved 2026-09-22) |
+| **M1** | Packaging and CI | `pyproject.toml`; unit and integration tests separated by pytest markers; an **Azure Pipeline** running lint and unit tests on every pull request | **built and verified locally; waiting on the Azure DevOps organization** |
 | M2 | A registrable model | A pyfunc bundling weights, scaler and config, with a signature, registered in Unity Catalog; champion and shadow challenger per D3 | not started |
 | M3 | Training pipeline and CD | An Asset Bundle deploying a training job to dev, staging and prod **from Azure Pipelines**, with the promotion gate below | not started |
 | M4 | Batch inference | A scheduled job scoring champion **and** shadow challenger into one Delta table | not started |
@@ -217,3 +221,64 @@ includes the workspace user's email.
   (`…/browse/folders/…`). The Go CLI tolerates it. The Python SDK, and
   therefore MLflow run from this machine, does not. It needs fixing before
   M2 and M3.
+
+---
+
+## M1 results (2026-09-22)
+
+| Piece | What it does |
+|---|---|
+| `pyproject.toml` | Makes `acidity-lstm` an installable package: `src/` layout, version from `acidity_lstm.__version__`, dependency floors. Exact pins stay in `requirements.txt`. Also holds the pytest and ruff settings. |
+| `requirements-dev.txt` | `requirements.txt` plus `ruff==0.16.8` |
+| `integration` marker | 71 tests that read the real data; CI deselects them (`DEVIATIONS.md` D-34) |
+| `tests/conftest.py` | Skips integration tests with a reason when the data is missing; `ACIDITY_REQUIRE_DATA=1` makes that a failure instead |
+| ruff | An explicit rule set (`F`, `E4`, `E7`, `E9`), so an upgrade cannot widen it silently. 14 unused imports and empty f-strings were fixed. |
+| `azure-pipelines.yml` | On each pull request into `main` and each push to it: CPU PyTorch, the pinned dependencies, lint, unit tests with published results, a wheel as a pipeline artifact |
+
+**Verified** by cloning the repo fresh, so no `data/` is present as on a CI
+agent, and running the pipeline's exact commands in a new Python 3.12 venv.
+Every step passed in about 2.5 minutes: 200 unit tests passed and 71 were
+deselected. torch stayed on the CPU build throughout, and the wheel built.
+The full local suite, data included, passes all 271 tests.
+
+**A packaging bug found and fixed.** An installed (non-editable) wheel
+lives in site-packages, where `load_config()` looked for
+`configs/base.yaml` and failed. Worse, `repo_root` pointed into
+site-packages even when a config path was passed. That would have broken
+the preflight's `requirements.txt` check and the report's `DEVIATIONS.md`
+parsing as soon as a job installed the wheel. `repo_root` now comes from
+the config's own location, `<root>/configs/base.yaml`. Every notebook
+already passes that path explicitly, so they work with an installed wheel
+unchanged. A test covers it.
+
+**Not yet shown:** the pipeline running in Azure DevOps. That needs the
+organization below.
+
+## M1: Azure DevOps setup (user)
+
+1. **Create the organization.** Go to <https://dev.azure.com> and sign in
+   with the Microsoft account you use for Azure. Choose **New
+   organization**, pick a name, set the region to **Canada Central**, and
+   continue.
+2. **Create a project** named `EquitySilver`, visibility **Private**.
+3. **Get a build agent.** A new organization has no free
+   Microsoft-hosted agent. Choose one of:
+   - **Request the free grant** at <https://aka.ms/azpipelines-parallelism-request>.
+     It takes about 2–3 business days. After that, `azure-pipelines.yml`
+     runs as written.
+   - **Run a self-hosted agent on this PC.** It is free and works
+     immediately. Go to **Project settings > Agent pools > Default > New
+     agent > Windows**. `pool:` then becomes `name: Default`, and the agent
+     needs Python 3.12 in its tool cache.
+   - **Buy a Microsoft-hosted parallel job**, about US$40/month, under
+     **Organization settings > Billing**.
+4. **Create the pipeline.** Go to **Pipelines > Create Pipeline > GitHub
+   (YAML)**. Authorize the **Azure Pipelines** GitHub App, and grant it
+   *only* `Huangc495/EquitySilver`. Select the repository, choose
+   **Existing Azure Pipelines YAML file**, set branch `main` and path
+   `/azure-pipelines.yml`, then **Run**.
+5. **Optional: require the check on GitHub.** Go to **Settings > Rules >
+   Rulesets > New branch ruleset** on `main` and require the pipeline's
+   status check. This only works on a private repository with GitHub Pro
+   (see D6).
+

@@ -9,3 +9,8 @@ __pycache__/
 # The source paper is a copyrighted Elsevier article and this repo is public.
 # Keep your own copy at docs/Ma_2021_JCH.pdf; see docs/README.md for the DOI.
 docs/*.pdf
+
+# Build outputs (pyproject.toml).
+dist/
+build/
+*.egg-info/

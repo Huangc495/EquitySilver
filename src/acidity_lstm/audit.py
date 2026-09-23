@@ -597,7 +597,7 @@ def run_sample_count_report(cfg: Config) -> str:
            "day of its lookback window has both precipitation and mean "
            "temperature. Nothing is imputed.")
     w(out)
-    w(out, f"Measurements available after cleaning: "
+    w(out, "Measurements available after cleaning: "
            + ", ".join(f"**{k} {v}**" for k, v in
                        acidity.groupby('station').size().items())
            + " (both exactly match Ma et al.).")

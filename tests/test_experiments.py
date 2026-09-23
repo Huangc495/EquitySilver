@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -41,6 +40,7 @@ def fast(cfg, **sections):
 
 # --- Config overrides -----------------------------------------------------
 
+@pytest.mark.integration
 def test_override_does_not_mutate_the_original(data):
     cfg, _, _ = data
     before = cfg["split"]["method"]
@@ -49,6 +49,7 @@ def test_override_does_not_mutate_the_original(data):
     assert cfg["split"]["method"] == before
 
 
+@pytest.mark.integration
 def test_every_variant_is_a_valid_override(data):
     cfg, _, _ = data
     for name, updates in VARIANTS.items():
@@ -57,6 +58,7 @@ def test_every_variant_is_a_valid_override(data):
         assert c["scaling"]["fit_on"] in ("all", "train"), name
 
 
+@pytest.mark.integration
 def test_paper_variant_uses_the_unmodified_config(data):
     cfg, _, _ = data
     c = override(cfg, VARIANTS["paper"])
@@ -67,6 +69,7 @@ def test_paper_variant_uses_the_unmodified_config(data):
 
 # --- Sample-set preparation ----------------------------------------------
 
+@pytest.mark.integration
 def test_prepare_sample_sets_assigns_every_split(data):
     cfg, acidity, weather = data
     sets = prepare_sample_sets(cfg, acidity, weather, seed=42)
@@ -76,6 +79,7 @@ def test_prepare_sample_sets_assigns_every_split(data):
         assert set(s.meta["split"]) == set(SPLIT_NAMES), key
 
 
+@pytest.mark.integration
 def test_blocked_variant_never_produces_an_empty_fold(data):
     """The Q-03 failure mode: empty years must not become a whole fold."""
     cfg, acidity, weather = data
@@ -88,6 +92,7 @@ def test_blocked_variant_never_produces_an_empty_fold(data):
                 assert counts.get(name, 0) > 0, f"{key} seed={seed}: {name} is empty"
 
 
+@pytest.mark.integration
 def test_blocked_variant_keeps_years_intact(data):
     cfg, acidity, weather = data
     c = override(cfg, VARIANTS["blocked"])
@@ -97,6 +102,7 @@ def test_blocked_variant_keeps_years_intact(data):
         assert (per_year == 1).all(), f"{key}: a year was split across folds"
 
 
+@pytest.mark.integration
 def test_common_variant_equalises_the_sample_sets(data):
     cfg, acidity, weather = data
     c = override(cfg, VARIANTS["common"])
@@ -109,6 +115,7 @@ def test_common_variant_equalises_the_sample_sets(data):
 
 # --- Grid execution -------------------------------------------------------
 
+@pytest.mark.integration
 def test_run_variant_covers_the_whole_grid(data):
     cfg, acidity, weather = data
     results = run_variant(fast(cfg), acidity, weather, "paper",
@@ -118,6 +125,7 @@ def test_run_variant_covers_the_whole_grid(data):
     assert keys == {("BD", "A", 5), ("BD", "B", 5), ("C7", "A", 5), ("C7", "B", 5)}
 
 
+@pytest.mark.integration
 def test_scenario_row_is_complete_and_finite(data):
     cfg, acidity, weather = data
     results = run_variant(fast(cfg), acidity, weather, "paper",
@@ -131,6 +139,7 @@ def test_scenario_row_is_complete_and_finite(data):
         assert row["diff"] == pytest.approx(row["best_mse"] - row["paper_mse"])
 
 
+@pytest.mark.integration
 def test_best_mse_is_the_minimum_over_repeats(data):
     cfg, acidity, weather = data
     results = run_variant(fast(cfg), acidity, weather, "paper",
@@ -140,6 +149,7 @@ def test_best_mse_is_the_minimum_over_repeats(data):
         assert s.best.selection_mse == s.summary["best_all_mse"]
 
 
+@pytest.mark.integration
 def test_scenario_carries_metadata_for_figures(data):
     cfg, acidity, weather = data
     results = run_variant(fast(cfg), acidity, weather, "paper",
@@ -150,6 +160,7 @@ def test_scenario_carries_metadata_for_figures(data):
         assert {"date", "split", "acidity_mgL"} <= set(s.meta.columns)
 
 
+@pytest.mark.integration
 def test_run_variant_is_reproducible(data):
     cfg, acidity, weather = data
     c = fast(cfg)
@@ -173,6 +184,7 @@ def test_fit_line_on_constant_x_is_nan():
     assert np.isnan(a) and np.isnan(b)
 
 
+@pytest.mark.integration
 def test_figures_are_written(tmp_path, data):
     from acidity_lstm.evaluate import (
         scatter_measured_vs_calculated,
@@ -194,6 +206,7 @@ def test_figures_are_written(tmp_path, data):
         assert Path(p).exists() and Path(p).stat().st_size > 5000
 
 
+@pytest.mark.integration
 def test_scatter_r_matches_the_reported_metric(data):
     """The R drawn on Fig. 6 must be the same number the table reports."""
     cfg, acidity, weather = data

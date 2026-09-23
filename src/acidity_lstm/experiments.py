@@ -16,10 +16,9 @@ import numpy as np
 import pandas as pd
 
 from .config import Config, on_databricks
-from .evaluate import Evaluation
 from .preprocess import clean_acidity, clean_weather
 from .scaling import Scaler, fit_scaler_for
-from .splits import SPLIT_NAMES, assign_splits, eligible_years_from, realised_counts
+from .splits import assign_splits, eligible_years_from, realised_counts
 from .train import TrainResult, best_of, summarise_repeats, train_repeats
 from .windows import build_sample_sets, make_weather_arrays
 

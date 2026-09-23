@@ -625,3 +625,33 @@ It is moot here, but it matters for anyone reusing that spec elsewhere.
 **Effect:** none on the model or the method. Whether the numpy 1 → 2
 change moves any number is checked by rerunning the pipeline locally
 against the committed reports (M0).
+
+### D-34 CI runs the unit tests only; the data-dependent tests are marked — *active*
+`CLAUDE.md` rule 6 says `pytest` must pass before any experiment runs. The
+suite was written assuming the real data sits in `data/raw`. The data is
+gitignored, so a CI runner would never have it, and 71 of the 270 tests
+failed or errored without it.
+
+Those 71 now carry the `integration` marker, registered in
+`pyproject.toml`. `test_phases78.py` is marked as a whole module; the rest
+are marked test by test, so the unit tests beside them still run in CI.
+The marking was checked both ways:
+
+| Check | Result |
+|---|---|
+| `-m "not integration"` with the data hidden | 199 passed, 0 errors |
+| `-m integration` with the data present | 71 passed: exactly the set that broke without data |
+| full suite with the data present | all pass |
+
+`tests/conftest.py` skips integration tests with a stated reason when the
+data is missing, rather than letting 66 fixtures error one by one.
+`ACIDITY_REQUIRE_DATA=1` turns that into a hard failure, for places where
+the data is supposed to be present.
+
+**Rule 6 still holds where the data lives.** CI (`azure-pipelines.yml`)
+proves the code; the full suite, integration tests included, must still
+pass locally or on Databricks before an experiment runs.
+
+**Effect:** none on results. The tests that lock the paper's sample
+counts, BD 365 and C7 384, are integration tests, so CI cannot catch a
+regression in them. Only a run with the data can.

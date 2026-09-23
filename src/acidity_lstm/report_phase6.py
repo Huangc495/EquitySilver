@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 
-import numpy as np
 import pandas as pd
 
 from .audit import _md_table, w
@@ -217,7 +216,7 @@ def _section_figures(out, table, scenarios, figs):
 
     w(out, f"![Fig 7](figures/{figs['fig7'].name})")
     w(out)
-    w(out, f"*Fig. 7 - BD measured vs calculated acidity over time, normalised. "
+    w(out, "*Fig. 7 - BD measured vs calculated acidity over time, normalised. "
            "Validation and test samples are ringed.*")
     w(out)
     w(out, f"![Fig 7 mg/L](figures/{figs['fig7_mgL'].name})")

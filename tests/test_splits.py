@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -192,6 +191,7 @@ def real_sets():
     return c, acidity, build_sample_sets(acidity, weather, c)
 
 
+@pytest.mark.integration
 def test_eligible_years_excludes_the_empty_years(real_sets):
     _, _, sets = real_sets
     years = eligible_years_from({k: v for k, v in sets.items() if k[1] == "B"})
@@ -200,6 +200,7 @@ def test_eligible_years_excludes_the_empty_years(real_sets):
     assert len(years) >= 3
 
 
+@pytest.mark.integration
 def test_split_is_shared_across_input_types(real_sets):
     """One split per station, inherited by every input type (Phase 5)."""
     cfg_r, acidity, _ = real_sets
@@ -221,6 +222,7 @@ def test_split_is_shared_across_input_types(real_sets):
     assert (a.loc[shared] == b.loc[shared]).all(), "types must agree on shared dates"
 
 
+@pytest.mark.integration
 def test_realised_proportions_drift_from_70_15_15(real_sets):
     """Expected: dropping is uneven, so realised splits are not exactly 70/15/15."""
     cfg_r, acidity, _ = real_sets
@@ -239,6 +241,7 @@ def test_realised_proportions_drift_from_70_15_15(real_sets):
     assert 0.55 < train_frac < 0.85, f"train fraction {train_frac:.2f} looks wrong"
 
 
+@pytest.mark.integration
 def test_no_sample_is_left_unassigned(real_sets):
     cfg_r, acidity, _ = real_sets
     from acidity_lstm.preprocess import clean_weather
