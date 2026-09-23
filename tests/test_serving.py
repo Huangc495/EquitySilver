@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -212,7 +211,6 @@ def test_logged_model_round_trips_through_mlflow(cfg, tmp_path):
 
     weather = synthetic_weather()
     s, scaler, spec, model = trained_like(cfg, weather, with_tag=True)
-    scenario = SimpleNamespace(scaler=scaler, best=SimpleNamespace(model=model))
     example = weather.iloc[-70:].reset_index(drop=True)
 
     previous = mlflow.get_tracking_uri()
@@ -220,7 +218,8 @@ def test_logged_model_round_trips_through_mlflow(cfg, tmp_path):
     try:
         mlflow.set_experiment("serving-round-trip")
         with mlflow.start_run():
-            uri = log_model(mlflow, scenario, cfg, spec, example, cfg["registry"]["pip_requirements"])
+            uri = log_model(mlflow, [model], scaler, cfg, spec, example,
+                            cfg["registry"]["pip_requirements"])
         loaded = mlflow.pyfunc.load_model(uri)
     finally:
         mlflow.set_tracking_uri(previous)

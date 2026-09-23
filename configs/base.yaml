@@ -119,6 +119,9 @@ registry:
       window_type: B
       hidden_size: 10
       time_tag: per_step
+  # Schema per environment (MLOPS.md D8): the Asset Bundle target passes
+  # dev, staging or prod; `schema` above is the fallback.
+  environments: [dev, staging, prod]
   # What a fresh environment needs to load the model. CPU-only torch: the
   # default Linux wheel pulls about 2.5 GB of CUDA.
   pip_requirements:
@@ -127,3 +130,14 @@ registry:
     - "numpy==2.1.3"
     - "pandas==2.2.3"
     - "PyYAML==6.0.2"
+
+# Promotion gate (MLOPS.md M3; decisions D9, D10). Recipes are compared by
+# blocked cross-validation by year; the winner is refit on every year.
+gate:
+  n_folds: 5                   # eligible years dealt into folds, each held out once
+  val_years: 2                 # early-stopping years, drawn from the rest per fold
+  n_seeds: 5                   # networks per recipe
+  selection: ensemble          # ensemble (D10) | best_train_val (the paper's best-of-n)
+  min_r: 0.2                   # floor on out-of-fold R, incumbent or not
+  rmse_tolerance_mgL: 0.0      # candidate may not exceed the incumbent's RMSE by more
+  max_r_drop: 0.0              # candidate may not trail the incumbent's R by more

@@ -685,3 +685,40 @@ it, so serving needs only torch and not the plotting stack.
 
 **Effect:** none on any replication result. The champion's quoted
 performance carries D-22's optimism until M3 re-judges it.
+
+### D-36 Production models use a backtested, 5-seed recipe — *active*
+From M3, the models that reach `@champion` and `@challenger` are no longer
+made the paper's way (`MLOPS.md` D9, D10):
+
+| | Paper recipe (replication, M2) | Production recipe (M3) |
+|---|---|---|
+| Split | random 70/15/15 by measurement | none: refit on every year |
+| Seeds | best of 5 by all-sample MSE | the average of all 5 |
+| Epochs | early stopping on validation rows | fixed: the backtest's median `epochs_run` |
+| Scaler | fitted on all samples | fitted on all samples, which are all training rows here |
+| How it is judged | all-sample MSE (D-22) | out-of-fold R and RMSE in mg/L from blocked 5-fold CV by year |
+
+Inside the backtest, each fold's scaler is fitted on its training rows
+only. When the paper recipe is backtested as an incumbent, its best-of-5
+is chosen on training and validation rows, never on the held-out fold.
+
+**First comparison on the real data** (local, 5 folds x 5 seeds), against
+the paper recipe:
+
+| Slot | Paper: out-of-fold R / RMSE | Production: R / RMSE | Gate |
+|---|---|---|---|
+| BD champion | 0.538 / 2487 mg/L | 0.542 / 2448 | promoted |
+| BD challenger | 0.691 / 2152 | 0.694 / 2101 | promoted |
+| C7 champion | 0.419 / 5268 | 0.436 / 5213 | promoted |
+| C7 challenger | 0.586 / 4806 | 0.558 / 4805 | rejected: R fell |
+
+These are the first held-out-year figures for either recipe. BD's
+champion reaches R 0.54 out of fold, against 0.67 over all samples: the
+held-out years give the honest number. The ensemble's gains are small, R
++0.004 to +0.017, well within the noise. With zero tolerance the gate
+decides on differences that small, and whether it should is an open
+threshold question for the user.
+
+**Effect:** none on the replication. Production models are judged on
+held-out years, so their quoted performance is lower than the
+replication's and more honest.

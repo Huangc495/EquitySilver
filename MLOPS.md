@@ -10,7 +10,7 @@ disagree, this file is newer.
 phase, every setting in config, every seed logged, notebooks thin, the same
 code locally and on Databricks.
 
-Decisions here are numbered **D1–D7**; D1–D6 follow `HANDOVER.md` section 3.
+Decisions here are numbered **D1–D10**; D1–D6 follow `HANDOVER.md` section 3.
 They are separate from the deviations `D-00` onwards in `DEVIATIONS.md`.
 
 ---
@@ -29,6 +29,9 @@ the workspace turned out to have no classic compute.
 | D5 | CI/CD host | **Azure DevOps Pipelines** | GitHub Actions |
 | D6 | Repository visibility | **Make it private** | same |
 | D7 | Compute | **Serverless with a pinned environment** | *(not foreseen: the handover assumed a classic ML cluster)* |
+| D8 | Environments (M3) | **dev, staging and prod schemas in one workspace** | same |
+| D9 | Promotion gate (M3) | **Backtest both recipes on the same held-out years, then refit the winner on all years** | same |
+| D10 | Seeds in the shipped model (M3) | **Average 5 seeds** | same |
 
 ### D1 Databricks-native
 
@@ -136,6 +139,45 @@ serverless over creating a new workspace with classic compute.
   the Asset Bundle in M3 and the scoring job in M4 later. There are no
   clusters to size, start or terminate.
 
+### D8 Environments are schemas in one workspace
+
+The catalog `equity_silver_databricks_mlops` gets three schemas, `dev`,
+`staging` and `prod`. Each holds its own registered models and, from M4, its
+own prediction tables. The raw data stays in `default` and is shared,
+read-only. The Asset Bundle's targets differ only in schema and job name.
+No new Azure resources are needed.
+
+### D9 The gate backtests recipes, then refits the winner
+
+A trained model cannot be compared fairly with one trained on different
+rows. So the gate compares **recipes**: the candidate's and the current
+champion's, reconstructed from its recorded configuration.
+
+- **Backtest:** blocked cross-validation by year. The eligible years are
+  split into folds, and each fold is held out once, so every sample gets
+  an out-of-fold prediction. Both recipes see exactly the same folds. Test
+  metrics then cover about 185 samples rather than a single 23-sample
+  fold, which matters given how noisy these metrics are (HANDOVER.md
+  section 4).
+- **Compare** on out-of-fold R and RMSE in mg/L, never normalised MSE
+  (D-18).
+- **Refit** the winner on all years. There is no year left for early
+  stopping, so the refit trains for the median `epochs_run` observed in
+  the backtest, with early stopping off.
+- **The tagged challenger is never promoted by backtest alone** (D3).
+  Held-out years inside the record let the time tag interpolate, which
+  flatters it (D-24, D-29). Its promotion needs evidence from the shadow
+  record.
+
+### D10 The shipped model averages 5 seeds
+
+Seed-to-seed spread is large: forecast MSE ranged from 0.27 to 0.57
+(D-28). The shipped model averages the normalised predictions of 5
+networks trained with different seeds (about 500 parameters each) and
+then inverse-transforms. That removes the luck of the draw and replaces
+best-of-5 selection, which favours overfitting (D-22). It departs from the
+paper and is recorded as a deviation.
+
 ---
 
 ## Plan
@@ -146,8 +188,8 @@ The phases from `HANDOVER.md` section 9, adjusted for the decisions above.
 |---|---|---|---|
 | **M0** | Databricks baseline | Preflight fully green on serverless; notebooks 00–06 run on Databricks and reproduce the local numbers; D-01 closed from the platform's actual versions | **done** (approved 2026-09-22) |
 | **M1** | Packaging and CI | `pyproject.toml`; unit and integration tests separated by pytest markers; an **Azure Pipeline** running lint and unit tests on every pull request | **built and verified locally; waiting on the Azure Repos import and the agent** |
-| **M2** | A registrable model | A pyfunc bundling weights, scaler and config, with a signature, registered in Unity Catalog; champion and shadow challenger per D3 | **done, awaiting approval** |
-| M3 | Training pipeline and CD | An Asset Bundle deploying a training job to dev, staging and prod **from Azure Pipelines**, with the promotion gate below | not started |
+| **M2** | A registrable model | A pyfunc bundling weights, scaler and config, with a signature, registered in Unity Catalog; champion and shadow challenger per D3 | **done** (approved 2026-09-23) |
+| **M3** | Training pipeline and CD | An Asset Bundle deploying a training job to dev, staging and prod **from Azure Pipelines**, with the promotion gate (D9) | **in progress** |
 | M4 | Batch inference | A scheduled job scoring champion **and** shadow challenger into one Delta table | not started |
 | M5 | Monitoring | Input drift, prediction drift, window completeness, time-tag extrapolation distance, and delayed-label performance, with alert thresholds | not started |
 | M6 | Data ingestion | Daily Environment Canada pull for station 1072692; acidity uploads to the `raw` volume picked up and validated | not started |
@@ -364,4 +406,56 @@ passes 219 with the data hidden. Lint is clean.
 - M5 monitors `window_complete` and `time_tag_z`.
 - MLflow logs a harmless `Py4JSecurityException` on serverless, because
   one tag-context lookup is blocked there; it has no effect.
+
+---
+
+## M3 plan
+
+| Step | Content | Needs |
+|---|---|---|
+| M3a | Library: 5-seed ensemble in the pyfunc (D10); blocked k-fold-by-year backtest; the gate; fixed-epoch refit (D9); tests; a local end-to-end run | nothing external |
+| M3b | `databricks.yml` Asset Bundle: the `dev`, `staging` and `prod` schemas (D8), and a serverless training job (preflight → backtest and gate → refit and register) that installs the package as a wheel | the workspace |
+| M3c | CD in Azure Pipelines: deploy the bundle to dev, then staging, then prod behind an approval, authenticating as a service principal through a workload identity federation service connection | M1's pipeline running, and the directory connection (a) |
+
+The Azure DevOps organization, the Databricks workspace and the Azure
+subscription are all in the same Entra tenant. So one service principal
+created there can be both the pipeline's identity and a Databricks
+workspace user.
+
+### M3a results (2026-09-23): the recipe, the gate and the refit
+
+Library only; nothing outside this machine yet.
+
+| Piece | Where |
+|---|---|
+| `Recipe`: window, hidden size, time tag, selection (`ensemble` or `best_train_val`), seeds | `backtest.py` |
+| Blocked 5-fold CV by year. Each eligible year is held out once; validation years come from the rest; the scaler is fitted on training rows only | `backtest.backtest` |
+| The gate: candidate no worse than the incumbent on out-of-fold RMSE (mg/L) and R, and above an R floor | `backtest.gate`, `gate:` in `configs/base.yaml` |
+| The refit: every year, for the backtest's median `epochs_run`, early stopping off | `backtest.refit` |
+| Ensembles: the pyfunc averages N networks in normalised units | `serving.predict_members`, `ModelSpec.n_members` |
+| The flow: backtest both recipes, gate, refit, register, and move the alias only on promotion; one MLflow run per slot records both backtests and the decision | `registry.train_and_register` |
+| Incumbents' recipes are rebuilt from version tags. M2's v1 reads as the paper recipe; M3 versions carry `recipe_json` | `backtest.recipe_from_tags` |
+
+**On the real data** (local, 68 s for both stations and both roles), against
+M2's paper-recipe incumbents:
+
+| Slot | Paper: out-of-fold R / RMSE | Production | Gate |
+|---|---|---|---|
+| BD champion | 0.538 / 2487 mg/L | 0.542 / 2448 | promoted |
+| BD challenger | 0.691 / 2152 | 0.694 / 2101 | promoted |
+| C7 champion | 0.419 / 5268 | 0.436 / 5213 | promoted |
+| C7 challenger | 0.586 / 4806 | 0.558 / 4805 | **rejected** (R fell) |
+
+The gate works in both directions. The out-of-fold R values are the first
+held-out-year figures for these models, and they sit well below the
+all-sample ones: BD's champion reaches 0.54 against 0.67. The ensemble's
+gains are small (R +0.004 to +0.017) and within the noise.
+
+**Open question for the M3 stop:** with `rmse_tolerance_mgL: 0` and
+`max_r_drop: 0`, the gate decides on differences that small. A margin, or a
+paired comparison across folds, would stop promotions and rejections
+driven by noise.
+
+**Tests:** 311 pass with the data, 17 of them new for M3. CI's selection
+passes 235 with the data hidden.
 

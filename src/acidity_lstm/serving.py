@@ -42,6 +42,7 @@ class ModelSpec:
     with_time_tag: bool
     time_tag_mode: str
     time_tag_origin: str
+    n_members: int = 1          # networks averaged (MLOPS.md D10)
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -115,13 +116,27 @@ def _daily_calendar(weather: pd.DataFrame) -> pd.DataFrame:
     return daily.reindex(calendar).reset_index()
 
 
+def predict_members(models, X: np.ndarray) -> np.ndarray:
+    """Normalised prediction averaged over the ensemble's networks (D10).
+
+    One network is an ensemble of one, and returns exactly `predict`.
+    """
+    members = models if isinstance(models, (list, tuple)) else [models]
+    if len(members) == 1:
+        return predict(members[0], X)
+    return np.mean(np.stack([predict(m, X) for m in members]), axis=0)
+
+
 def predict_from_weather(
     weather: pd.DataFrame,
     spec: ModelSpec,
     scaler: Scaler,
-    model: torch.nn.Module,
+    model,
 ) -> pd.DataFrame:
     """Predicted acidity for a sample taken on each input day.
+
+    `model` is one network or a list of them; a list is averaged in
+    normalised units before the inverse transform (D10).
 
     One output row per input row, in input order. A day's prediction needs
     the complete window ending on it (70 days for Type B) inside the input;
@@ -156,7 +171,7 @@ def predict_from_weather(
     if complete.any():
         # float32 first, exactly as SampleSet stores training inputs.
         X = scaler.transform_x(feat[complete].astype(np.float32))
-        acidity[complete] = scaler.inverse_transform_y(predict(model, X))
+        acidity[complete] = scaler.inverse_transform_y(predict_members(model, X))
 
     time_tag_z = np.full(len(rows), np.nan)
     if spec.with_time_tag:
@@ -175,8 +190,9 @@ class AcidityModel(mlflow.pyfunc.PythonModel):
     """MLflow pyfunc around `predict_from_weather`.
 
     Artifacts: `spec` (ModelSpec JSON), `scaler` (scaler JSON) and `weights`
-    (a torch state_dict). The package itself travels as `code_paths`, so the
-    loaded model runs the same window code that trained it.
+    (a list of torch state_dicts, one per ensemble member). The package itself
+    travels as `code_paths`, so the loaded model runs the same window code
+    that trained it.
     """
 
     def load_context(self, context) -> None:
@@ -184,10 +200,18 @@ class AcidityModel(mlflow.pyfunc.PythonModel):
             self.spec = ModelSpec.from_dict(json.load(fh))
         with open(context.artifacts["scaler"], encoding="utf-8") as fh:
             self.scaler = scaler_from_dict(json.load(fh))
-        self.model = build_network(self.spec)
-        state = torch.load(context.artifacts["weights"], map_location="cpu", weights_only=True)
-        self.model.load_state_dict(state)
-        self.model.eval()
+        states = torch.load(context.artifacts["weights"], map_location="cpu", weights_only=True)
+        if isinstance(states, dict):            # a single state_dict: one member
+            states = [states]
+        if len(states) != self.spec.n_members:
+            raise ValueError(f"Spec says {self.spec.n_members} member(s); "
+                             f"weights hold {len(states)}.")
+        self.model = []
+        for state in states:
+            net = build_network(self.spec)
+            net.load_state_dict(state)
+            net.eval()
+            self.model.append(net)
 
     def predict(self, context, model_input: pd.DataFrame, params=None) -> pd.DataFrame:
         return predict_from_weather(model_input, self.spec, self.scaler, self.model)
